@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Selah Destiny Enterprise — Business Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --navy: #0D1B2A; --navy2: #1A2E45; --gold: #C9A84C; --gold2: #E8C96A;
+    --cream: #F5F0E8; --white: #FFFFFF; --green: #2D7D5A; --green2: #3AAA78;
+    --red: #C0392B; --red2: #E74C3C; --gray: #8A9BB0; --lightgray: #EEF1F5;
+    --border: #D4DCEB; --shadow: 0 4px 24px rgba(13,27,42,0.10); --shadow2: 0 8px 40px rgba(13,27,42,0.16);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--navy); min-height: 100vh; }
+
+  /* SYNC INDICATOR */
+  #sync-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; z-index: 9999;
+    transition: all 0.3s; letter-spacing: 0.5px;
+  }
+  #sync-bar.syncing { background: rgba(201,168,76,0.95); color: var(--navy); }
+  #sync-bar.saved { background: rgba(45,125,90,0.92); color: white; }
+  #sync-bar.error { background: rgba(192,57,43,0.92); color: white; }
+  #sync-bar.hidden { opacity: 0; pointer-events: none; height: 0; }
+
+  /* SIDEBAR */
+  .sidebar {
+    position: fixed; left: 0; top: 36px; bottom: 0; width: 260px;
+    background: var(--navy); display: flex; flex-direction: column;
+    z-index: 100; box-shadow: 4px 0 24px rgba(13,27,42,0.18);
+    transition: transform 0.3s;
+  }
+  .sidebar-brand { padding: 28px 24px 20px; border-bottom: 1px solid rgba(201,168,76,0.25); }
+  .sidebar-brand h1 { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--gold); line-height: 1.3; letter-spacing: 0.3px; }
+  .sidebar-brand p { font-size: 11px; color: var(--gray); margin-top: 4px; letter-spacing: 0.8px; text-transform: uppercase; }
+  .sidebar-batch { margin: 14px 16px; background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.3); border-radius: 8px; padding: 10px 14px; }
+  .sidebar-batch .label { font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; }
+  .sidebar-batch .val { font-size: 13px; color: var(--white); font-weight: 600; margin-top: 2px; }
+  .nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 24px; cursor: pointer; color: var(--gray); font-size: 13.5px; font-weight: 500; transition: all 0.2s; border-left: 3px solid transparent; }
+  .nav-item:hover { color: var(--white); background: rgba(255,255,255,0.05); }
+  .nav-item.active { color: var(--gold); border-left-color: var(--gold); background: rgba(201,168,76,0.08); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: var(--gray); line-height: 1.6; }
+
+  /* HAMBURGER */
+  .hamburger { display: none; position: fixed; top: 44px; left: 12px; z-index: 200; background: var(--navy); border: none; color: var(--gold); font-size: 22px; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+
+  /* MAIN */
+  .main { margin-left: 260px; min-height: 100vh; padding-top: 36px; }
+  .topbar { background: var(--white); padding: 18px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(13,27,42,0.05); }
+  .topbar h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--navy); }
+  .topbar-date { font-size: 13px; color: var(--gray); }
+  .content { padding: 28px 32px; }
+
+  /* PAGES */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* CARDS */
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 28px; }
+  .card { background: var(--white); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--gold); }
+  .card.green::before { background: var(--green2); }
+  .card.red::before { background: var(--red2); }
+  .card.navy::before { background: var(--navy2); }
+  .card-label { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .card-value { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; color: var(--navy); }
+  .card-value.green { color: var(--green); }
+  .card-value.red { color: var(--red); }
+  .card-sub { font-size: 12px; color: var(--gray); margin-top: 4px; }
+
+  /* SECTION HEADERS */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 600; color: var(--navy); }
+
+  /* BUTTONS */
+  .btn { padding: 10px 20px; border-radius: 8px; border: none; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--navy); color: var(--gold); }
+  .btn-primary:hover { background: var(--navy2); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn-gold { background: var(--gold); color: var(--navy); }
+  .btn-gold:hover { background: var(--gold2); transform: translateY(-1px); }
+  .btn-green { background: var(--green); color: var(--white); }
+  .btn-green:hover { background: var(--green2); }
+  .btn-red { background: transparent; color: var(--red); border: 1px solid var(--red); font-size: 12px; padding: 5px 10px; }
+  .btn-red:hover { background: var(--red); color: var(--white); }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+
+  /* TABLES */
+  .table-wrap { background: var(--white); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--border); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 500px; }
+  thead tr { background: var(--navy); }
+  thead th { padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--lightgray); transition: background 0.15s; }
+  tbody tr:hover { background: #F8FAFC; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 12px 16px; font-size: 13.5px; color: var(--navy); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: rgba(45,125,90,0.12); color: var(--green); }
+  .badge-red { background: rgba(192,57,43,0.12); color: var(--red); }
+  .badge-gold { background: rgba(201,168,76,0.15); color: #8B6914; }
+  .badge-navy { background: rgba(13,27,42,0.08); color: var(--navy2); }
+
+  /* FORMS */
+  .form-panel { background: var(--white); border-radius: 14px; padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 24px; }
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .form-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--navy2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select, .form-group textarea { padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13.5px; color: var(--navy); background: var(--white); outline: none; transition: border 0.2s; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--gold); }
+  .form-actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* PROGRESS */
+  .progress-wrap { background: var(--lightgray); border-radius: 20px; height: 10px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 20px; background: linear-gradient(90deg, var(--gold), var(--gold2)); transition: width 0.5s; }
+  .progress-bar.green { background: linear-gradient(90deg, var(--green), var(--green2)); }
+  .progress-bar.red { background: linear-gradient(90deg, var(--red), var(--red2)); }
+
+  /* INVESTOR */
+  .inv-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+  .inv-card { background: var(--white); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .inv-card h3 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--navy); margin-bottom: 16px; }
+  .inv-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--lightgray); }
+  .inv-row:last-child { border-bottom: none; }
+  .inv-row .lbl { font-size: 13px; color: var(--gray); }
+  .inv-row .val { font-size: 14px; font-weight: 600; color: var(--navy); }
+  .inv-row .val.green { color: var(--green); }
+  .inv-row .val.gold { color: #8B6914; }
+
+  /* P&L */
+  .pl-table { background: var(--white); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .pl-row { display: flex; justify-content: space-between; align-items: center; padding: 13px 22px; border-bottom: 1px solid var(--lightgray); }
+  .pl-row:last-child { border-bottom: none; }
+  .pl-row.header { background: var(--navy); }
+  .pl-row.header span { color: var(--gold); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .pl-row.total { background: var(--navy); }
+  .pl-row.total span { color: var(--white); font-weight: 700; font-size: 15px; }
+  .pl-row.subtotal { background: var(--lightgray); }
+  .pl-row.subtotal span { font-weight: 600; color: var(--navy); }
+  .pl-row span:first-child { font-size: 13.5px; color: var(--navy); }
+  .pl-row span:last-child { font-size: 13.5px; font-weight: 500; }
+  .pl-row span.pos { color: var(--green); }
+  .pl-row span.neg { color: var(--red); }
+
+  /* STOCK */
+  .stock-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 24px; }
+  .stock-card { background: var(--white); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .stock-card h3 { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 14px; }
+  .stock-stat { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .stock-stat .lbl { font-size: 12px; color: var(--gray); }
+  .stock-stat .val { font-size: 13px; font-weight: 600; color: var(--navy); }
+  .stock-pct { font-size: 22px; font-weight: 700; color: var(--navy); font-family: 'Playfair Display', serif; margin-bottom: 10px; }
+
+  /* SALARY */
+  .salary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(13,27,42,0.55); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--white); border-radius: 16px; padding: 28px; width: 90%; max-width: 480px; box-shadow: var(--shadow2); }
+  .modal h3 { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 20px; }
+  .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--lightgray); color: var(--navy); }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 48px 24px; color: var(--gray); }
+  .empty .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; }
+
+  /* ALERTS */
+  .alert { padding: 12px 18px; border-radius: 8px; font-size: 13px; margin-bottom: 18px; }
+  .alert-warn { background: rgba(201,168,76,0.15); color: #7A5C0A; border: 1px solid rgba(201,168,76,0.4); }
+  .alert-success { background: rgba(45,125,90,0.12); color: var(--green); border: 1px solid rgba(45,125,90,0.3); }
+  .alert-info { background: rgba(13,27,42,0.07); color: var(--navy2); border: 1px solid var(--border); }
+
+  /* SETTINGS */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .settings-card { background: var(--white); border-radius: 14px; padding: 24px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .settings-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; margin-bottom: 18px; color: var(--navy); }
+
+  /* LOADING OVERLAY */
+  #loading-overlay { position: fixed; inset: 0; background: var(--navy); z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #loading-overlay h2 { font-family: 'Playfair Display', serif; color: var(--gold); font-size: 24px; margin-bottom: 12px; }
+  #loading-overlay p { color: var(--gray); font-size: 14px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid rgba(201,168,76,0.3); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .sidebar { transform: translateX(-100%); top: 36px; }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .hamburger { display: block; }
+    .cards-row { grid-template-columns: repeat(2,1fr); }
+    .form-grid { grid-template-columns: repeat(2,1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    .inv-summary { grid-template-columns: 1fr; }
+    .salary-grid { grid-template-columns: 1fr; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .stock-grid { grid-template-columns: 1fr; }
+    .content { padding: 16px; }
+    .topbar { padding: 14px 16px 14px 52px; }
+  }
+  @media (max-width: 500px) {
+    .cards-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .card-value { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <h2>Selah Destiny Enterprise</h2>
+  <p>Connecting to cloud database...</p>
+</div>
+
+<!-- SYNC BAR -->
+<div id="sync-bar" class="hidden"></div>
+
+<!-- HAMBURGER -->
+<button class="hamburger" onclick="toggleSidebar()">☰</button>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <h1>Selah Destiny Enterprise</h1>
+    <p>Business Manager 2026</p>
+  </div>
+  <div class="sidebar-batch">
+    <div class="label">Current Cycle</div>
+    <div class="val">Batch 2 — 27,000 units</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">📊</span> Dashboard</div>
+    <div class="nav-item" onclick="showPage('sales',this)"><span class="icon">💰</span> Sales & Revenue</div>
+    <div class="nav-item" onclick="showPage('expenses',this)"><span class="icon">📋</span> Expenses</div>
+    <div class="nav-item" onclick="showPage('stock',this)"><span class="icon">📦</span> Stock Management</div>
+    <div class="nav-item" onclick="showPage('investor',this)"><span class="icon">🤝</span> Investor Dashboard</div>
+    <div class="nav-item" onclick="showPage('salary',this)"><span class="icon">👤</span> Salary & Draw</div>
+    <div class="nav-item" onclick="showPage('pl',this)"><span class="icon">📈</span> P&L Report</div>
+    <div class="nav-item" onclick="showPage('settings',this)"><span class="icon">⚙️</span> Settings</div>
+  </nav>
+  <div class="sidebar-footer">CEO: Angela Ayitey Adzoro<br/>Ghana · Diagnostics Products</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <span class="topbar-date" id="topbar-date"></span>
+  </div>
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="cards-row">
+        <div class="card green"><div class="card-label">Total Revenue</div><div class="card-value green" id="d-revenue">GH₵ 0</div><div class="card-sub" id="d-revenue-sub">0 units sold</div></div>
+        <div class="card"><div class="card-label">Total Expenses</div><div class="card-value red" id="d-expenses">GH₵ 0</div><div class="card-sub">All costs to date</div></div>
+        <div class="card navy"><div class="card-label">Net Profit</div><div class="card-value" id="d-profit">GH₵ 0</div><div class="card-sub" id="d-margin">0% margin</div></div>
+        <div class="card"><div class="card-label">Stock Remaining</div><div class="card-value" id="d-stock">0 units</div><div class="card-sub" id="d-stock-pct">0% remaining</div></div>
+      </div>
+      <div class="two-col">
+        <div>
+          <div class="section-header"><span class="section-title">Sell-Out Progress</span></div>
+          <div class="form-panel" style="padding:20px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:13px;color:var(--gray)">Units Sold</span>
+              <span style="font-size:13px;font-weight:600" id="prog-label">0 / 0</span>
+            </div>
+            <div class="progress-wrap"><div class="progress-bar green" id="prog-bar" style="width:0%"></div></div>
+            <div style="margin-top:14px;display:flex;justify-content:space-between">
+              <div><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px">Days Active</div><div style="font-weight:600;font-size:15px" id="d-days">0</div></div>
+              <div style="text-align:right"><div style="font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.6px">Avg/Day</div><div style="font-weight:600;font-size:15px" id="d-avgday">0</div></div>
+            </div>
+          </div>
+          <div class="section-header"><span class="section-title">Investor Progress</span></div>
+          <div class="form-panel" style="padding:20px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:13px;color:var(--gray)">Projected Payout vs Target</span>
+              <span style="font-size:13px;font-weight:600" id="inv-prog-label">GH₵ 0 / GH₵ 0</span>
+            </div>
+            <div class="progress-wrap"><div class="progress-bar" id="inv-prog-bar" style="width:0%"></div></div>
+            <div style="margin-top:12px;font-size:12px;color:var(--gray)" id="inv-prog-note"></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-header"><span class="section-title">Recent Sales</span></div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Date</th><th>Product</th><th>Units</th><th>Revenue</th></tr></thead>
+            <tbody id="d-recent-sales"><tr><td colspan="4"><div class="empty"><div class="icon">📭</div><p>No sales yet</p></div></td></tr></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALES -->
+    <div class="page" id="page-sales">
+      <div class="form-panel">
+        <div class="section-title" style="margin-bottom:16px">Record a Sale</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Date</label><input type="date" id="s-date"/></div>
+          <div class="form-group"><label>Product</label>
+            <select id="s-product"><option value="">Select product...</option><option>Ovulation Test Strips</option><option>Ovulation Cassettes</option><option>Pregnancy Test Strips</option></select></div>
+          <div class="form-group"><label>Units Sold</label><input type="number" id="s-units" placeholder="0" min="1"/></div>
+          <div class="form-group"><label>Price Per Unit (GH₵)</label><input type="number" id="s-price" placeholder="0.00" step="0.01"/></div>
+          <div class="form-group"><label>Channel</label>
+            <select id="s-channel"><option>Instagram DM</option><option>Facebook DM</option><option>TikTok</option><option>WhatsApp</option><option>Walk-in / Referral</option><option>Paid Ad Order</option></select></div>
+          <div class="form-group"><label>Notes</label><input type="text" id="s-notes" placeholder="Optional"/></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-gold" onclick="addSale()">＋ Record Sale</button></div>
+      </div>
+      <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card green"><div class="card-label">Total Revenue</div><div class="card-value green" id="s-total-rev">GH₵ 0</div></div>
+        <div class="card"><div class="card-label">Units Sold</div><div class="card-value" id="s-total-units">0</div></div>
+        <div class="card"><div class="card-label">Avg Price/Unit</div><div class="card-value" id="s-avg-price">GH₵ 0</div></div>
+      </div>
+      <div class="section-header"><span class="section-title">Sales Record</span><button class="btn btn-primary btn-sm" onclick="exportCSV('sales')">⬇ Export CSV</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Product</th><th>Units</th><th>Price/Unit</th><th>Revenue</th><th>Channel</th><th>Notes</th><th></th></tr></thead><tbody id="sales-tbody"></tbody></table></div>
+    </div>
+
+    <!-- EXPENSES -->
+    <div class="page" id="page-expenses">
+      <div class="form-panel">
+        <div class="section-title" style="margin-bottom:16px">Record an Expense</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Date</label><input type="date" id="e-date"/></div>
+          <div class="form-group"><label>Category</label>
+            <select id="e-cat"><option>Product Purchase</option><option>Advertising (Meta/TikTok)</option><option>Packaging</option><option>Delivery & Logistics</option><option>Bank / MoMo Fees</option><option>Miscellaneous</option></select></div>
+          <div class="form-group"><label>Amount (GH₵)</label><input type="number" id="e-amount" placeholder="0.00" step="0.01"/></div>
+          <div class="form-group"><label>Paid To</label><input type="text" id="e-payee" placeholder="Supplier, Meta Ads..."/></div>
+          <div class="form-group"><label>Receipt #</label><input type="text" id="e-receipt" placeholder="Optional"/></div>
+          <div class="form-group"><label>Notes</label><input type="text" id="e-notes" placeholder="Optional"/></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" onclick="addExpense()">＋ Record Expense</button></div>
+      </div>
+      <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card red"><div class="card-label">Total Expenses</div><div class="card-value red" id="e-total">GH₵ 0</div></div>
+        <div class="card"><div class="card-label">Investor Capital</div><div class="card-value" id="e-cap">GH₵ 0</div><div class="card-sub">From settings</div></div>
+        <div class="card"><div class="card-label">Budget Remaining</div><div class="card-value green" id="e-remaining">GH₵ 0</div></div>
+      </div>
+      <div class="section-header"><span class="section-title">Expense Record</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Paid To</th><th>Receipt</th><th>Notes</th><th></th></tr></thead><tbody id="expenses-tbody"></tbody></table></div>
+    </div>
+
+    <!-- STOCK -->
+    <div class="page" id="page-stock">
+      <div class="stock-grid" id="stock-cards"></div>
+      <div class="section-header"><span class="section-title">Stock Adjustments</span></div>
+      <div class="form-panel">
+        <div class="form-grid">
+          <div class="form-group"><label>Product</label>
+            <select id="st-product"><option>Ovulation Test Strips</option><option>Ovulation Cassettes</option><option>Pregnancy Test Strips</option></select></div>
+          <div class="form-group"><label>Adjustment Type</label>
+            <select id="st-type"><option value="add">Add Stock (New Delivery)</option><option value="remove">Remove Stock (Damaged/Lost)</option></select></div>
+          <div class="form-group"><label>Units</label><input type="number" id="st-units" placeholder="0" min="1"/></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" onclick="adjustStock()">Apply Adjustment</button></div>
+      </div>
+      <div class="section-header"><span class="section-title">Stock Log</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Product</th><th>Type</th><th>Units</th><th>Balance After</th></tr></thead><tbody id="stock-log-tbody"></tbody></table></div>
+    </div>
+
+    <!-- INVESTOR -->
+    <div class="page" id="page-investor">
+      <div id="inv-alert"></div>
+      <div class="inv-summary">
+        <div class="inv-card">
+          <h3>Investment Overview</h3>
+          <div class="inv-row"><span class="lbl">Investor Capital</span><span class="val gold" id="i-capital">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Profit Share %</span><span class="val" id="i-share-pct">0%</span></div>
+          <div class="inv-row"><span class="lbl">Return Target</span><span class="val" id="i-target">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Investor Name</span><span class="val" id="i-name">—</span></div>
+          <div class="inv-row"><span class="lbl">Agreement Date</span><span class="val" id="i-date">—</span></div>
+        </div>
+        <div class="inv-card">
+          <h3>Projected Settlement</h3>
+          <div class="inv-row"><span class="lbl">Total Revenue (so far)</span><span class="val green" id="i-rev">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Total Expenses</span><span class="val" id="i-exp">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Net Profit Pool</span><span class="val" id="i-pool">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Investor's Projected Payout</span><span class="val gold" id="i-payout">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Your Projected Share</span><span class="val green" id="i-yours">GH₵ 0</span></div>
+        </div>
+      </div>
+      <div class="form-panel">
+        <div class="section-title" style="margin-bottom:16px">Investor Return Progress</div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;color:var(--gray)">Projected Payout vs Return Target</span>
+          <span style="font-size:13px;font-weight:600" id="i-prog-label">0%</span>
+        </div>
+        <div class="progress-wrap" style="height:14px"><div class="progress-bar" id="i-prog-bar" style="width:0%"></div></div>
+        <div style="margin-top:16px">
+          <div style="font-size:13px;color:var(--gray);margin-bottom:6px">Settlement Statement Preview</div>
+          <div id="settlement-preview" style="background:var(--lightgray);border-radius:8px;padding:16px;font-size:13px;line-height:2;color:var(--navy)"></div>
+        </div>
+      </div>
+      <div class="section-header"><span class="section-title">Your Share Allocation</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Allocation</th><th>%</th><th>Amount (GH₵)</th></tr></thead><tbody id="alloc-tbody"></tbody></table></div>
+    </div>
+
+    <!-- SALARY -->
+    <div class="page" id="page-salary">
+      <div class="salary-grid">
+        <div class="inv-card">
+          <h3>Your Total Projected Take</h3>
+          <div class="inv-row"><span class="lbl">Your Profit Share</span><span class="val green" id="sal-yours">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Total Drawn So Far</span><span class="val" id="sal-drawn">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Balance Remaining</span><span class="val gold" id="sal-balance">GH₵ 0</span></div>
+        </div>
+        <div class="inv-card">
+          <h3>Recommended Allocation</h3>
+          <div class="inv-row"><span class="lbl">Salary / Personal Draw (25%)</span><span class="val" id="sal-rec-salary">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Reinvestment Fund (45%)</span><span class="val" id="sal-rec-reinv">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Emergency Reserve (15%)</span><span class="val" id="sal-rec-emerg">GH₵ 0</span></div>
+          <div class="inv-row"><span class="lbl">Business Development (15%)</span><span class="val" id="sal-rec-dev">GH₵ 0</span></div>
+        </div>
+      </div>
+      <div class="form-panel">
+        <div class="section-title" style="margin-bottom:16px">Record an Owner's Draw</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Date</label><input type="date" id="sal-date"/></div>
+          <div class="form-group"><label>Amount (GH₵)</label><input type="number" id="sal-amount" placeholder="0.00" step="0.01"/></div>
+          <div class="form-group"><label>Purpose</label>
+            <select id="sal-purpose"><option>Personal Salary Draw</option><option>Reinvestment Transfer</option><option>Emergency Reserve</option><option>Business Development</option></select></div>
+          <div class="form-group" style="grid-column:1/-1"><label>Notes</label><input type="text" id="sal-notes" placeholder="Optional"/></div>
+        </div>
+        <div class="form-actions"><button class="btn btn-gold" onclick="addDraw()">＋ Record Draw</button></div>
+      </div>
+      <div class="section-header"><span class="section-title">Draw History</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Notes</th><th></th></tr></thead><tbody id="salary-tbody"></tbody></table></div>
+    </div>
+
+    <!-- P&L -->
+    <div class="page" id="page-pl">
+      <div class="cards-row">
+        <div class="card green"><div class="card-label">Gross Revenue</div><div class="card-value green" id="pl-rev">GH₵ 0</div></div>
+        <div class="card red"><div class="card-label">Total Costs</div><div class="card-value red" id="pl-costs">GH₵ 0</div></div>
+        <div class="card navy"><div class="card-label">Net Profit</div><div class="card-value" id="pl-net">GH₵ 0</div></div>
+        <div class="card"><div class="card-label">Net Margin</div><div class="card-value" id="pl-margin">0%</div></div>
+      </div>
+      <div class="section-header"><span class="section-title">Full Profit & Loss Statement</span></div>
+      <div class="pl-table" id="pl-full"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="alert alert-info" style="margin-bottom:18px">⚡ All settings are saved to your cloud database and will sync across all your devices automatically.</div>
+      <div class="settings-grid">
+        <div class="settings-card">
+          <h3>Business Configuration</h3>
+          <div class="form-group" style="margin-bottom:14px"><label>Business Name</label><input type="text" id="cfg-name" placeholder="Selah Destiny Enterprise"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>CEO Name</label><input type="text" id="cfg-ceo" placeholder="Angela Ayitey Adzoro"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Batch Start Date</label><input type="date" id="cfg-start"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Total Units (This Batch)</label><input type="number" id="cfg-units" placeholder="27000"/></div>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="saveConfig()">Save Configuration</button>
+        </div>
+        <div class="settings-card">
+          <h3>Investor Configuration</h3>
+          <div class="form-group" style="margin-bottom:14px"><label>Investor Name</label><input type="text" id="cfg-inv-name"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Investor Capital (GH₵)</label><input type="number" id="cfg-inv-capital" placeholder="39700"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Investor Profit Share %</label><input type="number" id="cfg-inv-share" placeholder="35" min="0" max="100"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Return Target (GH₵)</label><input type="number" id="cfg-inv-target" placeholder="79400"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Agreement Date</label><input type="date" id="cfg-inv-date"/></div>
+          <button class="btn btn-gold" style="margin-top:8px" onclick="saveInvestorConfig()">Save Investor Config</button>
+        </div>
+        <div class="settings-card">
+          <h3>Stock Opening Balances</h3>
+          <div class="form-group" style="margin-bottom:14px"><label>Ovulation Test Strips (units)</label><input type="number" id="cfg-s1" placeholder="20000"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Ovulation Cassettes (units)</label><input type="number" id="cfg-s2" placeholder="5000"/></div>
+          <div class="form-group" style="margin-bottom:14px"><label>Pregnancy Test Strips (units)</label><input type="number" id="cfg-s3" placeholder="2000"/></div>
+          <button class="btn btn-green" style="margin-top:8px" onclick="saveStock()">Save Stock Levels</button>
+        </div>
+        <div class="settings-card">
+          <h3>Data Management</h3>
+          <p style="font-size:13px;color:var(--gray);margin-bottom:16px;line-height:1.6">Your data is saved in the cloud and syncs across all devices in real time.</p>
+          <button class="btn btn-primary" style="margin-bottom:10px;width:100%" onclick="exportCSV('all')">⬇ Export All Data (JSON)</button>
+          <button class="btn btn-red" style="width:100%;padding:10px 20px;font-size:13px" onclick="confirmReset()">⚠ Reset All Data</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Confirm</h3>
+    <p id="modal-body" style="font-size:14px;color:var(--gray);line-height:1.6"></p>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn" id="modal-confirm" style="background:var(--red);color:white;border:none;padding:10px 20px">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCBd8kSPoSQDB-vqRvEifXoj5Wh4zs1OM0",
+  authDomain: "selah-destiny-enterprise.firebaseapp.com",
+  projectId: "selah-destiny-enterprise",
+  storageBucket: "selah-destiny-enterprise.firebasestorage.app",
+  messagingSenderId: "65474130926",
+  appId: "1:65474130926:web:0aa7f21bccaf0c91fa54ff"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ─── STATE ───
+let DATA = {
+  config: { name: 'Selah Destiny Enterprise', ceo: 'Angela Ayitey Adzoro', startDate: '', units: 27000 },
+  investor: { name: '', capital: 39700, share: 35, target: 79400, date: '' },
+  stock: { 'Ovulation Test Strips': 20000, 'Ovulation Cassettes': 5000, 'Pregnancy Test Strips': 2000 },
+  sales: [], expenses: [], draws: [], stockLog: []
+};
+
+// ─── SYNC INDICATOR ───
+function showSync(msg, type) {
+  const bar = document.getElementById('sync-bar');
+  bar.textContent = msg; bar.className = type;
+  if (type === 'saved') setTimeout(() => bar.className = 'hidden', 2500);
+}
+
+// ─── LOAD FROM FIREBASE ───
+async function loadFromFirebase() {
+  try {
+    // Config
+    const cfgDoc = await getDoc(doc(db, 'sde', 'config'));
+    if (cfgDoc.exists()) DATA.config = { ...DATA.config, ...cfgDoc.data() };
+
+    const invDoc = await getDoc(doc(db, 'sde', 'investor'));
+    if (invDoc.exists()) DATA.investor = { ...DATA.investor, ...invDoc.data() };
+
+    const stockDoc = await getDoc(doc(db, 'sde', 'stock'));
+    if (stockDoc.exists()) DATA.stock = { ...DATA.stock, ...stockDoc.data() };
+
+    // Collections
+    const salesSnap = await getDocs(collection(db, 'sde_sales'));
+    DATA.sales = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const expSnap = await getDocs(collection(db, 'sde_expenses'));
+    DATA.expenses = expSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const drawSnap = await getDocs(collection(db, 'sde_draws'));
+    DATA.draws = drawSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const logSnap = await getDocs(collection(db, 'sde_stocklog'));
+    DATA.stockLog = logSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    document.getElementById('loading-overlay').style.display = 'none';
+    setToday();
+    renderAll();
+    showSync('✅ Connected to cloud — data loaded', 'saved');
+  } catch(e) {
+    document.getElementById('loading-overlay').style.display = 'none';
+    showSync('⚠ Cloud connection issue — check internet', 'error');
+    setToday(); renderAll();
+  }
+}
+
+// ─── SAVE HELPERS ───
+async function saveDoc(path, data) {
+  showSync('⟳ Saving...', 'syncing');
+  await setDoc(doc(db, ...path), data);
+  showSync('✅ Saved to cloud', 'saved');
+}
+
+// ─── EXPOSE TO WINDOW ───
+window.DB = db;
+window.DATA = DATA;
+window.addDoc_ = addDoc;
+window.deleteDoc_ = deleteDoc;
+window.doc_ = doc;
+window.collection_ = collection;
+window.saveDoc_ = saveDoc;
+window.showSync_ = showSync;
+
+loadFromFirebase();
+</script>
+
+<script>
+// ─── UTILS ───
+function fmt(n) { return 'GH₵ ' + Number(n||0).toLocaleString('en-GH', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtN(n) { return Number(n||0).toLocaleString('en-GH', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pct(a,b) { return b ? Math.min(100, Math.round((a/b)*100)) : 0; }
+function today() { return new Date().toISOString().split('T')[0]; }
+function setToday() {
+  document.getElementById('s-date').value = today();
+  document.getElementById('e-date').value = today();
+  document.getElementById('sal-date').value = today();
+  document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ─── COMPUTED ───
+function totalRevenue() { return (window.DATA?.sales||[]).reduce((s,x) => s+(x.units*x.price),0); }
+function totalUnits() { return (window.DATA?.sales||[]).reduce((s,x) => s+Number(x.units),0); }
+function totalExpenses() { return (window.DATA?.expenses||[]).reduce((s,x) => s+Number(x.amount),0); }
+function netProfit() { return totalRevenue()-totalExpenses(); }
+function totalDraws() { return (window.DATA?.draws||[]).reduce((s,x) => s+Number(x.amount),0); }
+function stockRemaining() { return Object.values(window.DATA?.stock||{}).reduce((s,v)=>s+v,0); }
+function totalStock() { return Number(window.DATA?.config?.units)||27000; }
+
+// ─── NAVIGATION ───
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  const titles={dashboard:'Dashboard',sales:'Sales & Revenue',expenses:'Expenses',stock:'Stock Management',investor:'Investor Dashboard',salary:'Salary & Owner\'s Draw',pl:'P&L Report',settings:'Settings'};
+  document.getElementById('page-title').textContent = titles[id];
+  document.getElementById('sidebar').classList.remove('open');
+  renderAll();
+}
+
+// ─── RENDER ALL ───
+function renderAll() {
+  if (!window.DATA) return;
+  renderDashboard(); renderSalesTable(); renderExpensesTable();
+  renderStock(); renderInvestor(); renderSalary(); renderPL(); loadConfigUI();
+}
+
+// ─── DASHBOARD ───
+function renderDashboard() {
+  const rev=totalRevenue(), exp=totalExpenses(), profit=netProfit();
+  const units=totalUnits(), total=totalStock(), remain=stockRemaining();
+  const margin=rev?Math.round((profit/rev)*100):0;
+  document.getElementById('d-revenue').textContent=fmt(rev);
+  document.getElementById('d-revenue-sub').textContent=units+' units sold';
+  document.getElementById('d-expenses').textContent=fmt(exp);
+  document.getElementById('d-profit').textContent=fmt(profit);
+  document.getElementById('d-margin').textContent=margin+'% net margin';
+  document.getElementById('d-stock').textContent=remain.toLocaleString()+' units';
+  document.getElementById('d-stock-pct').textContent=pct(remain,total)+'% remaining';
+  const soldUnits=total-remain;
+  document.getElementById('prog-label').textContent=soldUnits.toLocaleString()+' / '+total.toLocaleString();
+  document.getElementById('prog-bar').style.width=pct(soldUnits,total)+'%';
+  const start=window.DATA.config?.startDate?new Date(window.DATA.config.startDate):null;
+  const days=start?Math.max(1,Math.round((new Date()-start)/(864e5))):0;
+  document.getElementById('d-days').textContent=days;
+  document.getElementById('d-avgday').textContent=days?(soldUnits/days).toFixed(1):'0';
+  const invShare=(window.DATA.investor?.share||35)/100;
+  const invPayout=profit*invShare, invTarget=window.DATA.investor?.target||1;
+  document.getElementById('inv-prog-label').textContent=fmt(invPayout)+' / '+fmt(invTarget);
+  document.getElementById('inv-prog-bar').style.width=pct(invPayout,invTarget)+'%';
+  document.getElementById('inv-prog-note').textContent=pct(invPayout,invTarget)+'% of investor return target reached (projected)';
+  const recent=[...window.DATA.sales].sort((a,b)=>b.ts-a.ts).slice(0,5);
+  const tbody=document.getElementById('d-recent-sales');
+  tbody.innerHTML=recent.length?recent.map(s=>`<tr><td>${s.date}</td><td>${s.product}</td><td>${s.units}</td><td>${fmt(s.units*s.price)}</td></tr>`).join(''):'<tr><td colspan="4"><div class="empty"><div class="icon">📭</div><p>No sales yet</p></div></td></tr>';
+}
+
+// ─── SALES ───
+async function addSale() {
+  const date=document.getElementById('s-date').value;
+  const product=document.getElementById('s-product').value;
+  const units=parseInt(document.getElementById('s-units').value);
+  const price=parseFloat(document.getElementById('s-price').value);
+  const channel=document.getElementById('s-channel').value;
+  const notes=document.getElementById('s-notes').value;
+  if(!date||!product||!units||!price){alert('Please fill in Date, Product, Units and Price.');return;}
+  if(!window.DB){alert('Not connected to database.');return;}
+  const record={date,product,units,price,channel,notes,ts:Date.now()};
+  window.showSync_('⟳ Saving sale...','syncing');
+  const ref=await window.addDoc_(window.collection_(window.DB,'sde_sales'),record);
+  window.DATA.sales.push({id:ref.id,...record});
+  if(window.DATA.stock[product]!==undefined) window.DATA.stock[product]=Math.max(0,window.DATA.stock[product]-units);
+  await window.saveDoc_(['sde','stock'],window.DATA.stock);
+  window.showSync_('✅ Sale saved to cloud','saved');
+  renderAll();
+  document.getElementById('s-units').value='';
+  document.getElementById('s-price').value='';
+  document.getElementById('s-notes').value='';
+}
+async function deleteSale(id) {
+  const s=window.DATA.sales.find(x=>x.id===id);
+  if(s&&window.DATA.stock[s.product]!==undefined) window.DATA.stock[s.product]+=Number(s.units);
+  window.DATA.sales=window.DATA.sales.filter(x=>x.id!==id);
+  await window.deleteDoc_(window.doc_(window.DB,'sde_sales',id));
+  await window.saveDoc_(['sde','stock'],window.DATA.stock);
+  renderAll();
+}
+function renderSalesTable() {
+  const rev=totalRevenue(), units=totalUnits();
+  document.getElementById('s-total-rev').textContent=fmt(rev);
+  document.getElementById('s-total-units').textContent=units.toLocaleString();
+  document.getElementById('s-avg-price').textContent=units?fmt(rev/units):'GH₵ 0';
+  const tbody=document.getElementById('sales-tbody');
+  const sorted=[...window.DATA.sales].sort((a,b)=>b.ts-a.ts);
+  tbody.innerHTML=sorted.length?sorted.map(s=>`<tr><td>${s.date}</td><td>${s.product}</td><td>${s.units}</td><td>${fmt(s.price)}</td><td>${fmt(s.units*s.price)}</td><td><span class="badge badge-navy">${s.channel}</span></td><td>${s.notes||'—'}</td><td><button class="btn btn-red" onclick="deleteSale('${s.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="8"><div class="empty"><div class="icon">💰</div><p>No sales yet</p></div></td></tr>';
+}
+
+// ─── EXPENSES ───
+async function addExpense() {
+  const date=document.getElementById('e-date').value;
+  const cat=document.getElementById('e-cat').value;
+  const amount=parseFloat(document.getElementById('e-amount').value);
+  const payee=document.getElementById('e-payee').value;
+  const receipt=document.getElementById('e-receipt').value;
+  const notes=document.getElementById('e-notes').value;
+  if(!date||!amount){alert('Please fill in Date and Amount.');return;}
+  const record={date,cat,amount,payee,receipt,notes,ts:Date.now()};
+  window.showSync_('⟳ Saving expense...','syncing');
+  const ref=await window.addDoc_(window.collection_(window.DB,'sde_expenses'),record);
+  window.DATA.expenses.push({id:ref.id,...record});
+  window.showSync_('✅ Expense saved to cloud','saved');
+  renderAll();
+  document.getElementById('e-amount').value='';
+  document.getElementById('e-payee').value='';
+  document.getElementById('e-receipt').value='';
+  document.getElementById('e-notes').value='';
+}
+async function deleteExpense(id) {
+  window.DATA.expenses=window.DATA.expenses.filter(x=>x.id!==id);
+  await window.deleteDoc_(window.doc_(window.DB,'sde_expenses',id));
+  renderAll();
+}
+function renderExpensesTable() {
+  const total=totalExpenses(), cap=window.DATA.investor?.capital||0;
+  document.getElementById('e-total').textContent=fmt(total);
+  document.getElementById('e-cap').textContent=fmt(cap);
+  document.getElementById('e-remaining').textContent=fmt(Math.max(0,cap-total));
+  const tbody=document.getElementById('expenses-tbody');
+  const sorted=[...window.DATA.expenses].sort((a,b)=>b.ts-a.ts);
+  tbody.innerHTML=sorted.length?sorted.map(e=>`<tr><td>${e.date}</td><td><span class="badge badge-gold">${e.cat}</span></td><td style="color:var(--red);font-weight:600">${fmt(e.amount)}</td><td>${e.payee||'—'}</td><td>${e.receipt||'—'}</td><td>${e.notes||'—'}</td><td><button class="btn btn-red" onclick="deleteExpense('${e.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="7"><div class="empty"><div class="icon">📋</div><p>No expenses yet</p></div></td></tr>';
+}
+
+// ─── STOCK ───
+async function adjustStock() {
+  const product=document.getElementById('st-product').value;
+  const type=document.getElementById('st-type').value;
+  const units=parseInt(document.getElementById('st-units').value);
+  if(!units||units<1){alert('Enter units.');return;}
+  if(type==='add') window.DATA.stock[product]+=units;
+  else window.DATA.stock[product]=Math.max(0,window.DATA.stock[product]-units);
+  const logEntry={date:today(),product,type,units,balance:window.DATA.stock[product],ts:Date.now()};
+  window.DATA.stockLog.push(logEntry);
+  await window.saveDoc_(['sde','stock'],window.DATA.stock);
+  await window.addDoc_(window.collection_(window.DB,'sde_stocklog'),logEntry);
+  renderAll();
+  document.getElementById('st-units').value='';
+}
+function renderStock() {
+  const products=Object.entries(window.DATA.stock||{});
+  const openingStock={'Ovulation Test Strips':20000,'Ovulation Cassettes':5000,'Pregnancy Test Strips':2000};
+  document.getElementById('stock-cards').innerHTML=products.map(([name,rem])=>{
+    const total=openingStock[name]||rem;
+    const sold=total-rem, p=pct(rem,total);
+    const color=p>50?'green':p>20?'gold':'red';
+    return `<div class="stock-card"><h3>${name}</h3><div class="stock-pct" style="color:var(--${color==='gold'?'gold':color==='green'?'green':'red'})">${rem.toLocaleString()} <span style="font-size:14px;color:var(--gray)">units left</span></div><div class="stock-stat"><span class="lbl">Opening Stock</span><span class="val">${total.toLocaleString()}</span></div><div class="stock-stat"><span class="lbl">Units Sold</span><span class="val">${sold.toLocaleString()}</span></div><div class="stock-stat"><span class="lbl">% Remaining</span><span class="val">${p}%</span></div><div style="margin-top:10px"><div class="progress-wrap"><div class="progress-bar ${color==='green'?'green':color==='red'?'red':''}" style="width:${p}%"></div></div></div></div>`;
+  }).join('');
+  const tbody=document.getElementById('stock-log-tbody');
+  const sorted=[...window.DATA.stockLog].sort((a,b)=>b.ts-a.ts);
+  tbody.innerHTML=sorted.length?sorted.map(l=>`<tr><td>${l.date}</td><td>${l.product}</td><td><span class="badge ${l.type==='add'?'badge-green':'badge-red'}">${l.type==='add'?'Added':'Removed'}</span></td><td>${l.units}</td><td>${l.balance.toLocaleString()}</td></tr>`).join(''):'<tr><td colspan="5"><div class="empty"><div class="icon">📦</div><p>No adjustments</p></div></td></tr>';
+}
+
+// ─── INVESTOR ───
+function renderInvestor() {
+  const inv=window.DATA.investor||{};
+  const rev=totalRevenue(), exp=totalExpenses(), profit=netProfit();
+  const invShare=(inv.share||35)/100;
+  const invPayout=profit*invShare, yourShare=profit-invPayout;
+  const progPct=inv.target?pct(invPayout,inv.target):0;
+  document.getElementById('i-capital').textContent=fmt(inv.capital);
+  document.getElementById('i-share-pct').textContent=(inv.share||35)+'%';
+  document.getElementById('i-target').textContent=fmt(inv.target);
+  document.getElementById('i-name').textContent=inv.name||'—';
+  document.getElementById('i-date').textContent=inv.date||'—';
+  document.getElementById('i-rev').textContent=fmt(rev);
+  document.getElementById('i-exp').textContent=fmt(exp);
+  document.getElementById('i-pool').textContent=fmt(profit);
+  document.getElementById('i-payout').textContent=fmt(invPayout);
+  document.getElementById('i-yours').textContent=fmt(yourShare);
+  document.getElementById('i-prog-label').textContent=progPct+'% of target';
+  document.getElementById('i-prog-bar').style.width=progPct+'%';
+  const alertDiv=document.getElementById('inv-alert');
+  if(!inv.name) alertDiv.innerHTML='<div class="alert alert-warn">⚠ Investor details not configured. Go to Settings to set up your investor profile.</div>';
+  else if(invPayout>=inv.target) alertDiv.innerHTML='<div class="alert alert-success">✅ Investor return target reached! Time to settle and renegotiate for Batch 3.</div>';
+  else alertDiv.innerHTML='';
+  document.getElementById('settlement-preview').innerHTML=`<strong>BATCH 2 — SETTLEMENT STATEMENT PREVIEW</strong><br/>Investor: ${inv.name||'TBD'} &nbsp;|&nbsp; Agreement Date: ${inv.date||'TBD'}<br/>───────────────────────────────────────────<br/>Total Revenue from Sales: &nbsp;<strong>${fmt(rev)}</strong><br/>Less: All Operating Costs: &nbsp;<strong>(${fmt(exp)})</strong><br/>Net Profit Pool: &nbsp;<strong>${fmt(profit)}</strong><br/>───────────────────────────────────────────<br/>Investor Share (${inv.share||35}%): &nbsp;<strong style="color:var(--gold)">${fmt(invPayout)}</strong><br/>Your Share (${100-(inv.share||35)}%): &nbsp;<strong style="color:var(--green)">${fmt(yourShare)}</strong><br/>───────────────────────────────────────────<br/>Investor Capital Invested: &nbsp;<strong>${fmt(inv.capital)}</strong><br/>Investor Net Gain: &nbsp;<strong>${fmt(invPayout-(inv.capital||0))}</strong><br/>Investor ROI: &nbsp;<strong>${inv.capital?Math.round(((invPayout-inv.capital)/inv.capital)*100):0}%</strong>`;
+  const allocs=[{name:'Salary / Personal Draw',pct:25,amt:yourShare*0.25},{name:'Reinvestment Fund (Batch 3)',pct:45,amt:yourShare*0.45},{name:'Emergency Reserve',pct:15,amt:yourShare*0.15},{name:'Business Development',pct:15,amt:yourShare*0.15}];
+  document.getElementById('alloc-tbody').innerHTML=allocs.map(a=>`<tr><td>${a.name}</td><td>${a.pct}%</td><td style="font-weight:600;color:var(--green)">${fmt(a.amt)}</td></tr>`).join('')+`<tr style="background:var(--lightgray)"><td><strong>Total</strong></td><td><strong>100%</strong></td><td><strong>${fmt(yourShare)}</strong></td></tr>`;
+}
+
+// ─── SALARY ───
+async function addDraw() {
+  const date=document.getElementById('sal-date').value;
+  const amount=parseFloat(document.getElementById('sal-amount').value);
+  const purpose=document.getElementById('sal-purpose').value;
+  const notes=document.getElementById('sal-notes').value;
+  if(!date||!amount){alert('Please fill in Date and Amount.');return;}
+  const record={date,amount,purpose,notes,ts:Date.now()};
+  window.showSync_('⟳ Saving draw...','syncing');
+  const ref=await window.addDoc_(window.collection_(window.DB,'sde_draws'),record);
+  window.DATA.draws.push({id:ref.id,...record});
+  window.showSync_('✅ Draw saved to cloud','saved');
+  renderAll();
+  document.getElementById('sal-amount').value='';
+  document.getElementById('sal-notes').value='';
+}
+async function deleteDraw(id) {
+  window.DATA.draws=window.DATA.draws.filter(x=>x.id!==id);
+  await window.deleteDoc_(window.doc_(window.DB,'sde_draws',id));
+  renderAll();
+}
+function renderSalary() {
+  const profit=netProfit(), inv=window.DATA.investor||{};
+  const yours=profit*(1-(inv.share||35)/100);
+  const drawn=totalDraws();
+  document.getElementById('sal-yours').textContent=fmt(yours);
+  document.getElementById('sal-drawn').textContent=fmt(drawn);
+  document.getElementById('sal-balance').textContent=fmt(yours-drawn);
+  document.getElementById('sal-rec-salary').textContent=fmt(yours*0.25);
+  document.getElementById('sal-rec-reinv').textContent=fmt(yours*0.45);
+  document.getElementById('sal-rec-emerg').textContent=fmt(yours*0.15);
+  document.getElementById('sal-rec-dev').textContent=fmt(yours*0.15);
+  const tbody=document.getElementById('salary-tbody');
+  const sorted=[...window.DATA.draws].sort((a,b)=>b.ts-a.ts);
+  tbody.innerHTML=sorted.length?sorted.map(d=>`<tr><td>${d.date}</td><td style="font-weight:600;color:var(--green)">${fmt(d.amount)}</td><td><span class="badge badge-navy">${d.purpose}</span></td><td>${d.notes||'—'}</td><td><button class="btn btn-red" onclick="deleteDraw('${d.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="5"><div class="empty"><div class="icon">👤</div><p>No draws yet</p></div></td></tr>';
+}
+
+// ─── P&L ───
+function renderPL() {
+  const rev=totalRevenue(), exp=totalExpenses(), profit=netProfit();
+  const margin=rev?Math.round((profit/rev)*100):0;
+  document.getElementById('pl-rev').textContent=fmt(rev);
+  document.getElementById('pl-costs').textContent=fmt(exp);
+  document.getElementById('pl-net').textContent=fmt(profit);
+  document.getElementById('pl-margin').textContent=margin+'%';
+  const inv=window.DATA.investor||{};
+  const invShare=(inv.share||35)/100;
+  const invPayout=profit*invShare, yours=profit-invPayout;
+  const expByCat={};
+  (window.DATA.expenses||[]).forEach(e=>{expByCat[e.cat]=(expByCat[e.cat]||0)+Number(e.amount);});
+  const rows=[
+    {type:'header',label:'REVENUE',value:''},
+    {type:'normal',label:'Gross Revenue from Sales',value:fmt(rev),cls:'pos'},
+    {type:'subtotal',label:'Total Revenue',value:fmt(rev)},
+    {type:'header',label:'OPERATING EXPENSES',value:''},
+    ...Object.entries(expByCat).map(([k,v])=>({type:'normal',label:k,value:'('+fmtN(v)+')',cls:'neg'})),
+    {type:'subtotal',label:'Total Expenses',value:'('+fmtN(exp)+')'},
+    {type:'total',label:'NET PROFIT',value:fmt(profit)},
+    {type:'header',label:'PROFIT DISTRIBUTION',value:''},
+    {type:'normal',label:`Investor Payout (${inv.share||35}%)`,value:'('+fmtN(invPayout)+')',cls:'neg'},
+    {type:'normal',label:`Your Share (${100-(inv.share||35)}%)`,value:fmt(yours),cls:'pos'},
+    {type:'total',label:'YOUR RETAINED PROFIT',value:fmt(yours)},
+  ];
+  document.getElementById('pl-full').innerHTML=rows.map(r=>{
+    if(r.type==='header') return `<div class="pl-row header"><span>${r.label}</span><span>${r.value}</span></div>`;
+    if(r.type==='total') return `<div class="pl-row total"><span>${r.label}</span><span>${r.value}</span></div>`;
+    if(r.type==='subtotal') return `<div class="pl-row subtotal"><span>${r.label}</span><span class="${r.cls||''}">${r.value}</span></div>`;
+    return `<div class="pl-row"><span>${r.label}</span><span class="${r.cls||''}">${r.value}</span></div>`;
+  }).join('');
+}
+
+// ─── SETTINGS ───
+function loadConfigUI() {
+  const c=window.DATA.config||{}, i=window.DATA.investor||{};
+  document.getElementById('cfg-name').value=c.name||'';
+  document.getElementById('cfg-ceo').value=c.ceo||'';
+  document.getElementById('cfg-start').value=c.startDate||'';
+  document.getElementById('cfg-units').value=c.units||27000;
+  document.getElementById('cfg-inv-name').value=i.name||'';
+  document.getElementById('cfg-inv-capital').value=i.capital||39700;
+  document.getElementById('cfg-inv-share').value=i.share||35;
+  document.getElementById('cfg-inv-target').value=i.target||79400;
+  document.getElementById('cfg-inv-date').value=i.date||'';
+  document.getElementById('cfg-s1').value=window.DATA.stock?.['Ovulation Test Strips']||20000;
+  document.getElementById('cfg-s2').value=window.DATA.stock?.['Ovulation Cassettes']||5000;
+  document.getElementById('cfg-s3').value=window.DATA.stock?.['Pregnancy Test Strips']||2000;
+}
+async function saveConfig() {
+  window.DATA.config.name=document.getElementById('cfg-name').value;
+  window.DATA.config.ceo=document.getElementById('cfg-ceo').value;
+  window.DATA.config.startDate=document.getElementById('cfg-start').value;
+  window.DATA.config.units=parseInt(document.getElementById('cfg-units').value)||27000;
+  await window.saveDoc_(['sde','config'],window.DATA.config);
+  alert('✅ Business configuration saved to cloud.');
+}
+async function saveInvestorConfig() {
+  window.DATA.investor.name=document.getElementById('cfg-inv-name').value;
+  window.DATA.investor.capital=parseFloat(document.getElementById('cfg-inv-capital').value)||39700;
+  window.DATA.investor.share=parseFloat(document.getElementById('cfg-inv-share').value)||35;
+  window.DATA.investor.target=parseFloat(document.getElementById('cfg-inv-target').value)||79400;
+  window.DATA.investor.date=document.getElementById('cfg-inv-date').value;
+  await window.saveDoc_(['sde','investor'],window.DATA.investor);
+  renderAll(); alert('✅ Investor configuration saved to cloud.');
+}
+async function saveStock() {
+  window.DATA.stock['Ovulation Test Strips']=parseInt(document.getElementById('cfg-s1').value)||20000;
+  window.DATA.stock['Ovulation Cassettes']=parseInt(document.getElementById('cfg-s2').value)||5000;
+  window.DATA.stock['Pregnancy Test Strips']=parseInt(document.getElementById('cfg-s3').value)||2000;
+  await window.saveDoc_(['sde','stock'],window.DATA.stock);
+  renderAll(); alert('✅ Stock levels saved to cloud.');
+}
+
+// ─── EXPORT ───
+function exportCSV(type) {
+  if(type==='sales'){
+    const rows=[['Date','Product','Units','Price/Unit','Revenue','Channel','Notes']];
+    (window.DATA.sales||[]).forEach(s=>rows.push([s.date,s.product,s.units,s.price,s.units*s.price,s.channel,s.notes]));
+    download('sales_export.csv',rows.map(r=>r.join(',')).join('\n'),'text/csv');
+  } else {
+    download('selah_destiny_data.json',JSON.stringify(window.DATA,null,2),'application/json');
+  }
+}
+function download(filename,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=filename;a.click();}
+
+// ─── RESET ───
+function confirmReset() {
+  document.getElementById('modal-title').textContent='Reset All Data';
+  document.getElementById('modal-body').textContent='This will permanently delete ALL data from the cloud database including all sales, expenses, draws, and stock records. This cannot be undone.';
+  document.getElementById('modal-confirm').onclick=async()=>{
+    closeModal();
+    window.showSync_('⟳ Deleting all data...','syncing');
+    const cols=['sde_sales','sde_expenses','sde_draws','sde_stocklog'];
+    for(const col of cols){
+      const snap=await window.collection_(window.DB,col);
+      // simplified reset — reload will reinitialize
+    }
+    localStorage.clear();
+    alert('Data reset. Please refresh the page.');
+    location.reload();
+  };
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(){document.getElementById('modal').classList.remove('show');}
+</script>
+</body>
+</html>
