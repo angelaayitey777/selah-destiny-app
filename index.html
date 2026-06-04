@@ -251,6 +251,10 @@
     <div class="nav-item" onclick="showPage('investor',this)"><span class="icon">🤝</span> Investor Dashboard</div>
     <div class="nav-item" onclick="showPage('salary',this)"><span class="icon">👤</span> Salary & Draw</div>
     <div class="nav-item" onclick="showPage('pl',this)"><span class="icon">📈</span> P&L Report</div>
+    <div class="nav-item" onclick="showPage('customers',this)"><span class="icon">👥</span> Customers</div>
+    <div class="nav-item" onclick="showPage('delivery',this)"><span class="icon">🚚</span> Delivery Tracker</div>
+    <div class="nav-item" onclick="showPage('monthly',this)"><span class="icon">📅</span> Monthly Reports</div>
+    <div class="nav-item" onclick="showPage('products',this)"><span class="icon">🏷️</span> Product Manager</div>
     <div class="nav-item" onclick="showPage('settings',this)"><span class="icon">⚙️</span> Settings</div>
   </nav>
   <div class="sidebar-footer">CEO: Angela Ayitey Adzoro<br/>Ghana · Diagnostics Products</div>
@@ -272,6 +276,7 @@
         <div class="card navy"><div class="card-label">Net Profit</div><div class="card-value" id="d-profit">GH₵ 0</div><div class="card-sub" id="d-margin">0% margin</div></div>
         <div class="card"><div class="card-label">Stock Remaining</div><div class="card-value" id="d-stock">0 units</div><div class="card-sub" id="d-stock-pct">0% remaining</div></div>
       </div>
+      <div id="low-stock-alerts"></div>
       <div class="two-col">
         <div>
           <div class="section-header"><span class="section-title">Sell-Out Progress</span></div>
@@ -299,7 +304,7 @@
         <div>
           <div class="section-header"><span class="section-title">Recent Sales</span></div>
           <div class="table-wrap">
-            <table><thead><tr><th>Date</th><th>Product</th><th>Units</th><th>Revenue</th></tr></thead>
+            <table><thead><tr><th>Date</th><th>Client</th><th>Product</th><th>Revenue</th></tr></thead>
             <tbody id="d-recent-sales"><tr><td colspan="4"><div class="empty"><div class="icon">📭</div><p>No sales yet</p></div></td></tr></tbody></table>
           </div>
         </div>
@@ -309,16 +314,46 @@
     <!-- SALES -->
     <div class="page" id="page-sales">
       <div class="form-panel">
-        <div class="section-title" style="margin-bottom:16px">Record a Sale</div>
+        <div class="section-title" style="margin-bottom:4px">Record a Sale</div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:16px">Select a product and package — units and price fill automatically.</div>
         <div class="form-grid">
           <div class="form-group"><label>Date</label><input type="date" id="s-date"/></div>
           <div class="form-group"><label>Product</label>
-            <select id="s-product"><option value="">Select product...</option><option>Ovulation Test Strips</option><option>Ovulation Cassettes</option><option>Pregnancy Test Strips</option></select></div>
-          <div class="form-group"><label>Units Sold</label><input type="number" id="s-units" placeholder="0" min="1"/></div>
-          <div class="form-group"><label>Price Per Unit (GH₵)</label><input type="number" id="s-price" placeholder="0.00" step="0.01"/></div>
+            <select id="s-product" onchange="loadBundles()">
+              <option value="">Select product...</option>
+              <option>Ovulation Test Strips</option>
+              <option>Ovulation Cassettes</option>
+              <option>Pregnancy Test Strips</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Package / Bundle</label>
+            <select id="s-bundle" onchange="applyBundle()">
+              <option value="">— Select product first —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Units (Auto-filled)</label>
+            <input type="number" id="s-units" placeholder="Auto-filled" min="1" readonly style="background:#f8fafc;color:var(--gray)"/>
+          </div>
+          <div class="form-group">
+            <label>Bundle Price (GH₵)</label>
+            <input type="number" id="s-price" placeholder="Auto-filled" step="0.01" readonly style="background:#f8fafc;color:var(--gray)"/>
+          </div>
+          <div class="form-group">
+            <label>No. of Bundles Sold</label>
+            <input type="number" id="s-qty" placeholder="1" min="1" value="1" oninput="updateTotal()"/>
+          </div>
           <div class="form-group"><label>Channel</label>
-            <select id="s-channel"><option>Instagram DM</option><option>Facebook DM</option><option>TikTok</option><option>WhatsApp</option><option>Walk-in / Referral</option><option>Paid Ad Order</option></select></div>
+            <select id="s-channel"><option>Instagram DM</option><option>Facebook DM</option><option>TikTok</option><option>WhatsApp</option><option>Walk-in / Referral</option><option>Paid Ad Order</option></select>
+          </div>
+          <div class="form-group"><label>Client Name</label><input type="text" id="s-client-name" placeholder="e.g. Abena Mensah"/></div>
+          <div class="form-group"><label>Phone Number</label><input type="tel" id="s-client-phone" placeholder="e.g. 0241234567"/></div>
+          <div class="form-group"><label>Location</label><input type="text" id="s-client-location" placeholder="e.g. Accra, Kumasi..."/></div>
           <div class="form-group"><label>Notes</label><input type="text" id="s-notes" placeholder="Optional"/></div>
+          <div class="form-group">
+            <label>Sale Total</label>
+            <div id="s-total-preview" style="padding:10px 14px;background:var(--navy);color:var(--gold);border-radius:8px;font-weight:700;font-size:15px;font-family:'Playfair Display',serif;">GH₵ 0.00</div>
+          </div>
         </div>
         <div class="form-actions"><button class="btn btn-gold" onclick="addSale()">＋ Record Sale</button></div>
       </div>
@@ -328,7 +363,7 @@
         <div class="card"><div class="card-label">Avg Price/Unit</div><div class="card-value" id="s-avg-price">GH₵ 0</div></div>
       </div>
       <div class="section-header"><span class="section-title">Sales Record</span><button class="btn btn-primary btn-sm" onclick="exportCSV('sales')">⬇ Export CSV</button></div>
-      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Product</th><th>Units</th><th>Price/Unit</th><th>Revenue</th><th>Channel</th><th>Notes</th><th></th></tr></thead><tbody id="sales-tbody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Phone</th><th>Location</th><th>Product</th><th>Package</th><th>Qty</th><th>Units</th><th>Revenue</th><th>Channel</th><th>Notes</th><th></th></tr></thead><tbody id="sales-tbody"></tbody></table></div>
     </div>
 
     <!-- EXPENSES -->
@@ -454,6 +489,34 @@
       <div class="pl-table" id="pl-full"></div>
     </div>
 
+    <!-- PRODUCTS -->
+    <div class="page" id="page-products">
+      <div class="alert alert-info" style="margin-bottom:18px">🏷️ Add, edit, or remove products here. Each product can have multiple bundle packages. Changes sync to cloud and update the sales form instantly.</div>
+      <div class="form-panel">
+        <div class="section-title" style="margin-bottom:16px">Add New Product</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Product Name</label><input type="text" id="p-name" placeholder="e.g. Ovulation Thermometer"/></div>
+          <div class="form-group"><label>Opening Stock (units)</label><input type="number" id="p-stock" placeholder="e.g. 200" min="1"/></div>
+          <div class="form-group"><label>Cost Price per Unit (GH₵)</label><input type="number" id="p-cost" placeholder="e.g. 80.00" step="0.01"/></div>
+          <div class="form-group"><label>Low Stock Alert Threshold</label><input type="number" id="p-threshold" placeholder="e.g. 500 units"/></div>
+        </div>
+        <div style="margin-top:18px">
+          <div style="font-size:12px;font-weight:600;color:var(--navy2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Bundle Packages (add at least one)</div>
+          <div id="bundle-inputs">
+            <div class="bundle-row" style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:10px;align-items:end">
+              <div class="form-group" style="margin:0"><label>Package Label</label><input type="text" placeholder="e.g. 10pcs" class="b-label"/></div>
+              <div class="form-group" style="margin:0"><label>Selling Price (GH₵)</label><input type="number" placeholder="e.g. 150" step="0.01" class="b-price"/></div>
+              <button class="btn btn-red" onclick="removeBundleRow(this)" style="height:40px;margin-top:auto">✕</button>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addBundleRow()" style="margin-top:4px">＋ Add Another Package</button>
+        </div>
+        <div class="form-actions"><button class="btn btn-gold" onclick="saveProduct()">＋ Add Product</button></div>
+      </div>
+      <div class="section-header"><span class="section-title">Your Products</span></div>
+      <div id="products-list"></div>
+    </div>
+
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div class="alert alert-info" style="margin-bottom:18px">⚡ All settings are saved to your cloud database and will sync across all your devices automatically.</div>
@@ -476,11 +539,9 @@
           <button class="btn btn-gold" style="margin-top:8px" onclick="saveInvestorConfig()">Save Investor Config</button>
         </div>
         <div class="settings-card">
-          <h3>Stock Opening Balances</h3>
-          <div class="form-group" style="margin-bottom:14px"><label>Ovulation Test Strips (units)</label><input type="number" id="cfg-s1" placeholder="20000"/></div>
-          <div class="form-group" style="margin-bottom:14px"><label>Ovulation Cassettes (units)</label><input type="number" id="cfg-s2" placeholder="5000"/></div>
-          <div class="form-group" style="margin-bottom:14px"><label>Pregnancy Test Strips (units)</label><input type="number" id="cfg-s3" placeholder="2000"/></div>
-          <button class="btn btn-green" style="margin-top:8px" onclick="saveStock()">Save Stock Levels</button>
+          <h3>Stock & Products</h3>
+          <p style="font-size:13px;color:var(--gray);line-height:1.7;margin-bottom:16px">Products and stock levels are now managed in the <strong>Product Manager</strong> section. Go there to add new products, set opening stock, configure bundle packages, and manage pricing.</p>
+          <button class="btn btn-green" style="width:100%" onclick="showPage('products',document.querySelector('[onclick*=products]'))">Go to Product Manager →</button>
         </div>
         <div class="settings-card">
           <h3>Data Management</h3>
@@ -493,6 +554,67 @@
 
   </div>
 </div>
+
+    <!-- CUSTOMERS -->
+    <div class="page" id="page-customers">
+      <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="card green"><div class="card-label">Total Customers</div><div class="card-value green" id="cust-total">0</div></div>
+        <div class="card navy"><div class="card-label">Total Revenue From Customers</div><div class="card-value" id="cust-rev">GH₵ 0</div></div>
+        <div class="card"><div class="card-label">Avg Spend Per Customer</div><div class="card-value" id="cust-avg">GH₵ 0</div></div>
+      </div>
+      <div class="section-header">
+        <span class="section-title">Customer Directory</span>
+        <input type="text" id="cust-search" placeholder="Search name, phone, location..." oninput="renderCustomers()" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;width:260px;outline:none"/>
+      </div>
+      <div id="customers-list"></div>
+    </div>
+
+    <!-- DELIVERY -->
+    <div class="page" id="page-delivery">
+      <div class="cards-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card"><div class="card-label">Pending</div><div class="card-value" id="del-pending" style="color:var(--gold)">0</div></div>
+        <div class="card"><div class="card-label">Packed</div><div class="card-value" id="del-packed" style="color:var(--navy)">0</div></div>
+        <div class="card"><div class="card-label">Dispatched</div><div class="card-value" id="del-dispatched" style="color:#8B5CF6">0</div></div>
+        <div class="card green"><div class="card-label">Delivered</div><div class="card-value green" id="del-delivered">0</div></div>
+      </div>
+      <div class="section-header">
+        <span class="section-title">Active Orders</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="del-filter" onchange="renderDelivery()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none">
+            <option value="all">All Orders</option>
+            <option value="Pending">Pending</option>
+            <option value="Packed">Packed</option>
+            <option value="Dispatched">Dispatched</option>
+            <option value="Delivered">Delivered</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Client</th><th>Phone</th><th>Location</th><th>Product</th><th>Bundle</th><th>Revenue</th><th>Status</th><th>Update</th></tr></thead>
+          <tbody id="delivery-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MONTHLY REPORTS -->
+    <div class="page" id="page-monthly">
+      <div class="section-header">
+        <span class="section-title">Monthly Performance</span>
+        <select id="monthly-year" onchange="renderMonthly()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none"></select>
+      </div>
+      <div id="monthly-summary-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:28px"></div>
+      <div class="section-title" style="margin-bottom:16px">Month by Month Breakdown</div>
+      <div class="table-wrap" style="margin-bottom:28px">
+        <table>
+          <thead><tr><th>Month</th><th>Units Sold</th><th>Revenue</th><th>Expenses</th><th>Net Profit</th><th>Investor (35%)</th><th>Your Share</th><th>Margin</th></tr></thead>
+          <tbody id="monthly-tbody"></tbody>
+        </table>
+      </div>
+      <div class="section-title" style="margin-bottom:16px">Revenue by Product (All Time)</div>
+      <div id="product-breakdown" style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px"></div>
+    </div>
+
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modal">
@@ -527,7 +649,13 @@ const db = getFirestore(app);
 let DATA = {
   config: { name: 'Selah Destiny Enterprise', ceo: 'Angela Ayitey Adzoro', startDate: '', units: 27000 },
   investor: { name: '', capital: 39700, share: 35, target: 79400, date: '' },
-  stock: { 'Ovulation Test Strips': 20000, 'Ovulation Cassettes': 5000, 'Pregnancy Test Strips': 2000 },
+  stock: { 'Ovulation Test Strips': 20000, 'Ovulation Cassettes': 5000, 'Pregnancy Test Strips': 2000, 'Ovulation Thermometer': 200 },
+  products: [
+    { id:'p1', name:'Ovulation Test Strips', stock:20000, costPrice:0, bundles:[{label:'20pcs',units:20,price:120},{label:'30pcs',units:30,price:175},{label:'40pcs',units:40,price:235},{label:'50pcs',units:50,price:290}] },
+    { id:'p2', name:'Ovulation Cassettes', stock:5000, costPrice:0, bundles:[{label:'10pcs',units:10,price:130},{label:'15pcs',units:15,price:190},{label:'20pcs',units:20,price:255},{label:'30pcs',units:30,price:380},{label:'40pcs',units:40,price:510},{label:'50pcs',units:50,price:630}] },
+    { id:'p3', name:'Pregnancy Test Strips', stock:2000, costPrice:0, bundles:[{label:'5pcs',units:5,price:30},{label:'10pcs',units:10,price:60},{label:'15pcs',units:15,price:85},{label:'20pcs',units:20,price:100},{label:'30pcs',units:30,price:150}] },
+    { id:'p4', name:'Ovulation Thermometer', stock:200, costPrice:0, bundles:[{label:'1pc',units:1,price:150}] }
+  ],
   sales: [], expenses: [], draws: [], stockLog: []
 };
 
@@ -550,6 +678,7 @@ async function loadFromFirebase() {
 
     const stockDoc = await getDoc(doc(db, 'sde', 'stock'));
     if (stockDoc.exists()) DATA.stock = { ...DATA.stock, ...stockDoc.data() };
+    else DATA.stock['Ovulation Thermometer'] = 200;
 
     // Collections
     const salesSnap = await getDocs(collection(db, 'sde_sales'));
@@ -563,6 +692,9 @@ async function loadFromFirebase() {
 
     const logSnap = await getDocs(collection(db, 'sde_stocklog'));
     DATA.stockLog = logSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const prodDoc = await getDoc(doc(db, 'sde', 'products'));
+    if (prodDoc.exists() && prodDoc.data().list) DATA.products = prodDoc.data().list;
 
     document.getElementById('loading-overlay').style.display = 'none';
     setToday();
@@ -591,6 +723,7 @@ window.doc_ = doc;
 window.collection_ = collection;
 window.saveDoc_ = saveDoc;
 window.showSync_ = showSync;
+window.setDoc_ = setDoc;
 
 loadFromFirebase();
 </script>
@@ -610,7 +743,7 @@ function setToday() {
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
 // ─── COMPUTED ───
-function totalRevenue() { return (window.DATA?.sales||[]).reduce((s,x) => s+(x.units*x.price),0); }
+function totalRevenue() { return (window.DATA?.sales||[]).reduce((s,x) => s+(x.totalRevenue||x.units*x.price),0); }
 function totalUnits() { return (window.DATA?.sales||[]).reduce((s,x) => s+Number(x.units),0); }
 function totalExpenses() { return (window.DATA?.expenses||[]).reduce((s,x) => s+Number(x.amount),0); }
 function netProfit() { return totalRevenue()-totalExpenses(); }
@@ -624,7 +757,7 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   if(el) el.classList.add('active');
-  const titles={dashboard:'Dashboard',sales:'Sales & Revenue',expenses:'Expenses',stock:'Stock Management',investor:'Investor Dashboard',salary:'Salary & Owner\'s Draw',pl:'P&L Report',settings:'Settings'};
+  const titles={dashboard:'Dashboard',sales:'Sales & Revenue',expenses:'Expenses',stock:'Stock Management',investor:'Investor Dashboard',salary:'Salary & Owner\'s Draw',pl:'P&L Report',products:'Product Manager',customers:'Customer Directory',delivery:'Delivery Tracker',monthly:'Monthly Reports',settings:'Settings'};
   document.getElementById('page-title').textContent = titles[id];
   document.getElementById('sidebar').classList.remove('open');
   renderAll();
@@ -634,7 +767,8 @@ function showPage(id, el) {
 function renderAll() {
   if (!window.DATA) return;
   renderDashboard(); renderSalesTable(); renderExpensesTable();
-  renderStock(); renderInvestor(); renderSalary(); renderPL(); loadConfigUI();
+  renderStock(); renderInvestor(); renderSalary(); renderPL(); loadConfigUI(); renderProducts(); refreshProductDropdowns();
+  renderCustomers(); renderDelivery(); renderMonthly();
 }
 
 // ─── DASHBOARD ───
@@ -663,30 +797,180 @@ function renderDashboard() {
   document.getElementById('inv-prog-note').textContent=pct(invPayout,invTarget)+'% of investor return target reached (projected)';
   const recent=[...window.DATA.sales].sort((a,b)=>b.ts-a.ts).slice(0,5);
   const tbody=document.getElementById('d-recent-sales');
-  tbody.innerHTML=recent.length?recent.map(s=>`<tr><td>${s.date}</td><td>${s.product}</td><td>${s.units}</td><td>${fmt(s.units*s.price)}</td></tr>`).join(''):'<tr><td colspan="4"><div class="empty"><div class="icon">📭</div><p>No sales yet</p></div></td></tr>';
+  tbody.innerHTML=recent.length?recent.map(s=>`<tr><td>${s.date}</td><td>${s.clientName||'—'}</td><td>${s.product}</td><td>${fmt(s.totalRevenue||s.units*s.price)}</td></tr>`).join(''):'<tr><td colspan="4"><div class="empty"><div class="icon">📭</div><p>No sales yet</p></div></td></tr>';
+}
+
+// ─── DYNAMIC BUNDLE DATA ───
+function getBundles() {
+  const map = {};
+  (window.DATA?.products||[]).forEach(p => {
+    map[p.name] = p.bundles.map((b,i) => ({ label: b.label + ' — GH₵ ' + b.price, units: b.units || 1, price: b.price, idx: i }));
+  });
+  return map;
+}
+
+// ─── PRODUCT MANAGER ───
+function addBundleRow() {
+  const container = document.getElementById('bundle-inputs');
+  const row = document.createElement('div');
+  row.className = 'bundle-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:10px;align-items:end';
+  row.innerHTML = `<div class="form-group" style="margin:0"><label>Package Label</label><input type="text" placeholder="e.g. 20pcs" class="b-label"/></div><div class="form-group" style="margin:0"><label>Selling Price (GH₵)</label><input type="number" placeholder="e.g. 200" step="0.01" class="b-price"/></div><button class="btn btn-red" onclick="removeBundleRow(this)" style="height:40px;margin-top:auto">✕</button>`;
+  container.appendChild(row);
+}
+function removeBundleRow(btn) {
+  const rows = document.querySelectorAll('.bundle-row');
+  if (rows.length > 1) btn.closest('.bundle-row').remove();
+}
+async function saveProduct() {
+  const name = document.getElementById('p-name').value.trim();
+  const stock = parseInt(document.getElementById('p-stock').value) || 0;
+  const costPrice = parseFloat(document.getElementById('p-cost').value) || 0;
+  const threshold = parseInt(document.getElementById('p-threshold').value) || 0;
+  if (!name) { alert('Please enter a product name.'); return; }
+  const rows = document.querySelectorAll('.bundle-row');
+  const bundles = [];
+  rows.forEach(row => {
+    const label = row.querySelector('.b-label').value.trim();
+    const price = parseFloat(row.querySelector('.b-price').value) || 0;
+    const units = parseInt(label) || 1;
+    if (label && price) bundles.push({ label, units, price });
+  });
+  if (!bundles.length) { alert('Please add at least one bundle package.'); return; }
+  const existing = window.DATA.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) { alert('A product with this name already exists.'); return; }
+  const newProduct = { id: 'p' + Date.now(), name, stock, costPrice, threshold, bundles };
+  window.DATA.products.push(newProduct);
+  window.DATA.stock[name] = stock;
+  await window.saveDoc_(['sde','products'], { list: window.DATA.products });
+  await window.saveDoc_(['sde','stock'], window.DATA.stock);
+  document.getElementById('p-name').value = '';
+  document.getElementById('p-stock').value = '';
+  document.getElementById('p-cost').value = '';
+  document.getElementById('p-threshold').value = '';
+  document.getElementById('bundle-inputs').innerHTML = `<div class="bundle-row" style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:10px;align-items:end"><div class="form-group" style="margin:0"><label>Package Label</label><input type="text" placeholder="e.g. 10pcs" class="b-label"/></div><div class="form-group" style="margin:0"><label>Selling Price (GH₵)</label><input type="number" placeholder="e.g. 150" step="0.01" class="b-price"/></div><button class="btn btn-red" onclick="removeBundleRow(this)" style="height:40px;margin-top:auto">✕</button></div>`;
+  renderAll();
+  alert('✅ Product saved successfully!');
+}
+async function deleteProduct(id) {
+  const p = window.DATA.products.find(x => x.id === id);
+  if (!p) return;
+  if (!confirm('Delete ' + p.name + '? This cannot be undone.')) return;
+  delete window.DATA.stock[p.name];
+  window.DATA.products = window.DATA.products.filter(x => x.id !== id);
+  await window.saveDoc_(['sde','products'], { list: window.DATA.products });
+  await window.saveDoc_(['sde','stock'], window.DATA.stock);
+  renderAll();
+}
+function renderProducts() {
+  const list = document.getElementById('products-list');
+  if (!list) return;
+  const products = window.DATA?.products || [];
+  if (!products.length) { list.innerHTML = '<div class="empty"><div class="icon">🏷️</div><p>No products added yet</p></div>'; return; }
+  list.innerHTML = products.map(p => `
+    <div style="background:var(--white);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:600;color:var(--navy)">${p.name}</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:3px">Opening Stock: ${(p.stock||0).toLocaleString()} units &nbsp;|&nbsp; Current: ${(window.DATA.stock[p.name]||0).toLocaleString()} units &nbsp;|&nbsp; Cost Price: ${fmt(p.costPrice||0)}/unit</div>
+        </div>
+        <button class="btn btn-red" onclick="deleteProduct('${p.id}')">Delete</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${p.bundles.map(b => `<span class="badge badge-gold" style="font-size:12px;padding:5px 12px">${b.label} — GH₵ ${b.price}</span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function refreshProductDropdowns() {
+  const products = window.DATA?.products || [];
+  const names = products.map(p => p.name);
+  // Sales product dropdown
+  const sProd = document.getElementById('s-product');
+  if (sProd) {
+    const cur = sProd.value;
+    sProd.innerHTML = '<option value="">Select product...</option>' + names.map(n => `<option${n===cur?' selected':''}>${n}</option>`).join('');
+  }
+  // Stock adjustment dropdown
+  const stProd = document.getElementById('st-product');
+  if (stProd) {
+    const cur = stProd.value;
+    stProd.innerHTML = names.map(n => `<option${n===cur?' selected':''}>${n}</option>`).join('');
+  }
+}
+
+function loadBundles() {
+  const product = document.getElementById('s-product').value;
+  const bundleSelect = document.getElementById('s-bundle');
+  bundleSelect.innerHTML = '<option value="">— Select package —</option>';
+  document.getElementById('s-units').value = '';
+  document.getElementById('s-price').value = '';
+  document.getElementById('s-qty').value = '1';
+  document.getElementById('s-total-preview').textContent = 'GH₵ 0.00';
+  const BUNDLES = getBundles();
+  if (!product || !BUNDLES[product]) return;
+  BUNDLES[product].forEach((b, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = b.label;
+    bundleSelect.appendChild(opt);
+  });
+}
+
+function applyBundle() {
+  const product = document.getElementById('s-product').value;
+  const idx = document.getElementById('s-bundle').value;
+  if (!product || idx === '') return;
+  const BUNDLES = getBundles();
+  const bundle = BUNDLES[product][idx];
+  document.getElementById('s-units').value = bundle.units;
+  document.getElementById('s-price').value = bundle.price;
+  document.getElementById('s-qty').value = 1;
+  updateTotal();
+}
+
+function updateTotal() {
+  const price = parseFloat(document.getElementById('s-price').value) || 0;
+  const qty = parseInt(document.getElementById('s-qty').value) || 1;
+  const total = price * qty;
+  document.getElementById('s-total-preview').textContent = 'GH₵ ' + total.toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
 // ─── SALES ───
 async function addSale() {
   const date=document.getElementById('s-date').value;
   const product=document.getElementById('s-product').value;
-  const units=parseInt(document.getElementById('s-units').value);
-  const price=parseFloat(document.getElementById('s-price').value);
+  const bundleIdx=document.getElementById('s-bundle').value;
+  const bundleUnits=parseInt(document.getElementById('s-units').value);
+  const bundlePrice=parseFloat(document.getElementById('s-price').value);
+  const qty=parseInt(document.getElementById('s-qty').value)||1;
   const channel=document.getElementById('s-channel').value;
   const notes=document.getElementById('s-notes').value;
-  if(!date||!product||!units||!price){alert('Please fill in Date, Product, Units and Price.');return;}
+  const clientName=document.getElementById('s-client-name').value;
+  const clientPhone=document.getElementById('s-client-phone').value;
+  const clientLocation=document.getElementById('s-client-location').value;
+  if(!date||!product||bundleIdx===''||!bundleUnits||!bundlePrice){alert('Please select a date, product, and package.');return;}
   if(!window.DB){alert('Not connected to database.');return;}
-  const record={date,product,units,price,channel,notes,ts:Date.now()};
+  const totalUnitsQty = bundleUnits * qty;
+  const totalRevQty = bundlePrice * qty;
+  const BUNDLES = getBundles(); const bundleLabel = BUNDLES[product]?.[bundleIdx]?.label || bundleIdx;
+  const record={date,product,bundle:bundleLabel,units:totalUnitsQty,price:bundlePrice,qty,totalRevenue:totalRevQty,channel,clientName,clientPhone,clientLocation,notes,ts:Date.now()};
   window.showSync_('⟳ Saving sale...','syncing');
   const ref=await window.addDoc_(window.collection_(window.DB,'sde_sales'),record);
   window.DATA.sales.push({id:ref.id,...record});
-  if(window.DATA.stock[product]!==undefined) window.DATA.stock[product]=Math.max(0,window.DATA.stock[product]-units);
+  if(window.DATA.stock[product]!==undefined) window.DATA.stock[product]=Math.max(0,window.DATA.stock[product]-totalUnitsQty);
   await window.saveDoc_(['sde','stock'],window.DATA.stock);
   window.showSync_('✅ Sale saved to cloud','saved');
   renderAll();
+  document.getElementById('s-bundle').innerHTML='<option value="">— Select product first —</option>';
   document.getElementById('s-units').value='';
   document.getElementById('s-price').value='';
+  document.getElementById('s-qty').value='1';
   document.getElementById('s-notes').value='';
+  document.getElementById('s-client-name').value='';
+  document.getElementById('s-client-phone').value='';
+  document.getElementById('s-client-location').value='';
+  document.getElementById('s-total-preview').textContent='GH₵ 0.00';
+  document.getElementById('s-product').value='';
 }
 async function deleteSale(id) {
   const s=window.DATA.sales.find(x=>x.id===id);
@@ -703,7 +987,7 @@ function renderSalesTable() {
   document.getElementById('s-avg-price').textContent=units?fmt(rev/units):'GH₵ 0';
   const tbody=document.getElementById('sales-tbody');
   const sorted=[...window.DATA.sales].sort((a,b)=>b.ts-a.ts);
-  tbody.innerHTML=sorted.length?sorted.map(s=>`<tr><td>${s.date}</td><td>${s.product}</td><td>${s.units}</td><td>${fmt(s.price)}</td><td>${fmt(s.units*s.price)}</td><td><span class="badge badge-navy">${s.channel}</span></td><td>${s.notes||'—'}</td><td><button class="btn btn-red" onclick="deleteSale('${s.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="8"><div class="empty"><div class="icon">💰</div><p>No sales yet</p></div></td></tr>';
+  tbody.innerHTML=sorted.length?sorted.map(s=>`<tr><td>${s.date}</td><td style='font-weight:600'>${s.clientName||'—'}</td><td>${s.clientPhone||'—'}</td><td>${s.clientLocation||'—'}</td><td>${s.product}</td><td><span class='badge badge-gold'>${s.bundle||'—'}</span></td><td>${s.qty||1}x</td><td>${s.units}</td><td>${fmt(s.totalRevenue||s.units*s.price)}</td><td><span class='badge badge-navy'>${s.channel}</span></td><td>${s.notes||'—'}</td><td><button class='btn btn-red' onclick="deleteSale('${s.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="12"><div class="empty"><div class="icon">💰</div><p>No sales yet</p></div></td></tr>';
 }
 
 // ─── EXPENSES ───
@@ -758,9 +1042,10 @@ async function adjustStock() {
 }
 function renderStock() {
   const products=Object.entries(window.DATA.stock||{});
-  const openingStock={'Ovulation Test Strips':20000,'Ovulation Cassettes':5000,'Pregnancy Test Strips':2000};
+  const openingStockMap={};
+  (window.DATA.products||[]).forEach(p=>{ openingStockMap[p.name]=p.stock||0; });
   document.getElementById('stock-cards').innerHTML=products.map(([name,rem])=>{
-    const total=openingStock[name]||rem;
+    const total=openingStockMap[name]||rem;
     const sold=total-rem, p=pct(rem,total);
     const color=p>50?'green':p>20?'gold':'red';
     return `<div class="stock-card"><h3>${name}</h3><div class="stock-pct" style="color:var(--${color==='gold'?'gold':color==='green'?'green':'red'})">${rem.toLocaleString()} <span style="font-size:14px;color:var(--gray)">units left</span></div><div class="stock-stat"><span class="lbl">Opening Stock</span><span class="val">${total.toLocaleString()}</span></div><div class="stock-stat"><span class="lbl">Units Sold</span><span class="val">${sold.toLocaleString()}</span></div><div class="stock-stat"><span class="lbl">% Remaining</span><span class="val">${p}%</span></div><div style="margin-top:10px"><div class="progress-wrap"><div class="progress-bar ${color==='green'?'green':color==='red'?'red':''}" style="width:${p}%"></div></div></div></div>`;
@@ -941,6 +1226,226 @@ function confirmReset() {
   document.getElementById('modal').classList.add('show');
 }
 function closeModal(){document.getElementById('modal').classList.remove('show');}
+// ─── LOW STOCK ALERTS ───
+function renderLowStockAlerts() {
+  const alerts = [];
+  (window.DATA?.products||[]).forEach(p => {
+    const current = window.DATA.stock[p.name] || 0;
+    const threshold = p.threshold || 0;
+    if (threshold > 0 && current <= threshold) {
+      alerts.push({ name: p.name, current, threshold });
+    }
+  });
+  const div = document.getElementById('low-stock-alerts');
+  if (!div) return;
+  if (!alerts.length) { div.innerHTML = ''; return; }
+  div.innerHTML = alerts.map(a => `
+    <div class="alert" style="background:rgba(192,57,43,0.1);color:var(--red);border:1px solid rgba(192,57,43,0.3);margin-bottom:10px">
+      ⚠ <strong>Low Stock:</strong> ${a.name} — only <strong>${a.current.toLocaleString()} units</strong> remaining (alert set at ${a.threshold.toLocaleString()})
+    </div>`).join('');
+}
+
+// ─── CUSTOMER DIRECTORY ───
+function buildCustomerMap() {
+  const map = {};
+  (window.DATA?.sales||[]).forEach(s => {
+    if (!s.clientName) return;
+    const key = s.clientPhone || s.clientName;
+    if (!map[key]) map[key] = { name: s.clientName, phone: s.clientPhone||'—', location: s.clientLocation||'—', totalSpent: 0, orders: 0, lastDate: '' };
+    map[key].totalSpent += (s.totalRevenue || s.units * s.price || 0);
+    map[key].orders += 1;
+    if (!map[key].lastDate || s.date > map[key].lastDate) map[key].lastDate = s.date;
+  });
+  return Object.values(map).sort((a,b) => b.totalSpent - a.totalSpent);
+}
+function renderCustomers() {
+  const customers = buildCustomerMap();
+  const search = (document.getElementById('cust-search')?.value||'').toLowerCase();
+  const filtered = search ? customers.filter(c =>
+    c.name.toLowerCase().includes(search) ||
+    c.phone.includes(search) ||
+    c.location.toLowerCase().includes(search)
+  ) : customers;
+  const totalRev = customers.reduce((s,c) => s+c.totalSpent, 0);
+  const el = v => document.getElementById(v);
+  if(el('cust-total')) el('cust-total').textContent = customers.length;
+  if(el('cust-rev')) el('cust-rev').textContent = fmt(totalRev);
+  if(el('cust-avg')) el('cust-avg').textContent = customers.length ? fmt(totalRev/customers.length) : 'GH₵ 0';
+  const list = document.getElementById('customers-list');
+  if (!list) return;
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty"><div class="icon">👥</div><p>' + (search ? 'No customers match your search' : 'No customers yet — start recording sales with client names') + '</p></div>';
+    return;
+  }
+  list.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Name</th><th>Phone</th><th>Location</th><th>Orders</th><th>Total Spent</th><th>Last Purchase</th><th>WhatsApp</th></tr></thead>
+    <tbody>${filtered.map(c => `<tr>
+      <td style="font-weight:600">${c.name}</td>
+      <td>${c.phone}</td>
+      <td>${c.location}</td>
+      <td><span class="badge badge-navy">${c.orders} order${c.orders>1?'s':''}</span></td>
+      <td style="font-weight:600;color:var(--green)">${fmt(c.totalSpent)}</td>
+      <td>${c.lastDate||'—'}</td>
+      <td>${c.phone && c.phone!=='—' ? `<a href="https://wa.me/233${c.phone.replace(/^0/,'').replace(/\D/g,'')}" target="_blank" class="btn btn-green btn-sm" style="text-decoration:none">💬 Chat</a>` : '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+// ─── DELIVERY TRACKER ───
+async function updateDeliveryStatus(saleId, newStatus) {
+  const sale = window.DATA.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  sale.deliveryStatus = newStatus;
+  window.showSync_('⟳ Updating delivery...', 'syncing');
+  await window.saveDoc_(['sde_sales_meta', saleId], { deliveryStatus: newStatus });
+  // Update in main sales collection
+  try {
+    const { setDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    // We store delivery status separately to avoid rewriting whole sale
+  } catch(e) {}
+  // Simple: re-save sale record
+  const ref = window.doc_(window.DB, 'sde_sales', saleId);
+  await window.setDoc_(ref, sale);
+  window.showSync_('✅ Status updated', 'saved');
+  renderDelivery();
+  renderDashboard();
+}
+function renderDelivery() {
+  const sales = [...(window.DATA?.sales||[])].sort((a,b) => b.ts - a.ts);
+  const filter = document.getElementById('del-filter')?.value || 'all';
+  const counts = { Pending:0, Packed:0, Dispatched:0, Delivered:0 };
+  sales.forEach(s => {
+    const st = s.deliveryStatus || 'Pending';
+    if (counts[st] !== undefined) counts[st]++;
+  });
+  const el = v => document.getElementById(v);
+  if(el('del-pending')) el('del-pending').textContent = counts.Pending;
+  if(el('del-packed')) el('del-packed').textContent = counts.Packed;
+  if(el('del-dispatched')) el('del-dispatched').textContent = counts.Dispatched;
+  if(el('del-delivered')) el('del-delivered').textContent = counts.Delivered;
+  const filtered = filter === 'all' ? sales : sales.filter(s => (s.deliveryStatus||'Pending') === filter);
+  const tbody = document.getElementById('delivery-tbody');
+  if (!tbody) return;
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="icon">🚚</div><p>No orders yet</p></div></td></tr>';
+    return;
+  }
+  const statusColors = { Pending:'badge-gold', Packed:'badge-navy', Dispatched:'', Delivered:'badge-green' };
+  const statusStyle = { Dispatched:'background:rgba(139,92,246,0.12);color:#6D28D9' };
+  const nextStatus = { Pending:'Packed', Packed:'Dispatched', Dispatched:'Delivered', Delivered:null };
+  const nextLabel = { Pending:'Mark Packed', Packed:'Mark Dispatched', Dispatched:'Mark Delivered', Delivered:'✅ Done' };
+  tbody.innerHTML = filtered.map(s => {
+    const st = s.deliveryStatus || 'Pending';
+    const badgeClass = statusColors[st] || '';
+    const badgeStyle = statusStyle[st] ? `style="${statusStyle[st]}"` : '';
+    const next = nextStatus[st];
+    return `<tr>
+      <td>${s.date}</td>
+      <td style="font-weight:600">${s.clientName||'—'}</td>
+      <td>${s.clientPhone||'—'}</td>
+      <td>${s.clientLocation||'—'}</td>
+      <td>${s.product}</td>
+      <td><span class="badge badge-gold">${s.bundle||'—'}</span></td>
+      <td style="font-weight:600;color:var(--green)">${fmt(s.totalRevenue||s.units*s.price)}</td>
+      <td><span class="badge ${badgeClass}" ${badgeStyle}>${st}</span></td>
+      <td>${next ? `<button class="btn btn-green btn-sm" onclick="updateDeliveryStatus('${s.id}','${next}')">${nextLabel[st]}</button>` : '<span style="color:var(--green);font-size:12px;font-weight:600">Completed</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── MONTHLY REPORTS ───
+function renderMonthly() {
+  const yearSel = document.getElementById('monthly-year');
+  if (!yearSel) return;
+  const sales = window.DATA?.sales || [];
+  const expenses = window.DATA?.expenses || [];
+  const years = [...new Set([...sales.map(s => s.date?.slice(0,4)), ...expenses.map(e => e.date?.slice(0,4))].filter(Boolean))].sort().reverse();
+  if (!years.length) years.push(new Date().getFullYear().toString());
+  const curYears = Array.from(yearSel.options).map(o => o.value);
+  if (JSON.stringify(curYears) !== JSON.stringify(years)) {
+    yearSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  }
+  const selYear = yearSel.value || years[0];
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthData = MONTHS.map((name, i) => {
+    const mStr = selYear + '-' + String(i+1).padStart(2,'0');
+    const mSales = sales.filter(s => s.date?.startsWith(mStr));
+    const mExp = expenses.filter(e => e.date?.startsWith(mStr));
+    const rev = mSales.reduce((s,x) => s+(x.totalRevenue||x.units*x.price||0), 0);
+    const exp = mExp.reduce((s,x) => s+Number(x.amount||0), 0);
+    const profit = rev - exp;
+    const units = mSales.reduce((s,x) => s+Number(x.units||0), 0);
+    const invShare = (window.DATA?.investor?.share||35)/100;
+    return { name, rev, exp, profit, units, invPayout: profit*invShare, yours: profit*(1-invShare) };
+  });
+  const totalRev = monthData.reduce((s,m) => s+m.rev, 0);
+  const totalExp = monthData.reduce((s,m) => s+m.exp, 0);
+  const totalProfit = totalRev - totalExp;
+  const bestMonth = monthData.reduce((best,m) => m.rev > best.rev ? m : best, monthData[0]);
+  const activeMonths = monthData.filter(m => m.rev > 0).length;
+  const cards = document.getElementById('monthly-summary-cards');
+  if (cards) cards.innerHTML = `
+    <div class="card green"><div class="card-label">Year Revenue (${selYear})</div><div class="card-value green">${fmt(totalRev)}</div><div class="card-sub">${activeMonths} active months</div></div>
+    <div class="card red"><div class="card-label">Year Expenses (${selYear})</div><div class="card-value red">${fmt(totalExp)}</div></div>
+    <div class="card navy"><div class="card-label">Best Month</div><div class="card-value" style="font-size:18px">${bestMonth.rev > 0 ? bestMonth.name : '—'}</div><div class="card-sub">${fmt(bestMonth.rev)}</div></div>
+  `;
+  const tbody = document.getElementById('monthly-tbody');
+  if (tbody) {
+    const rows = monthData.map(m => {
+      const margin = m.rev ? Math.round((m.profit/m.rev)*100) : 0;
+      const rowStyle = m.rev > 0 ? '' : 'color:var(--gray)';
+      return `<tr style="${rowStyle}">
+        <td style="font-weight:600">${m.name}</td>
+        <td>${m.units > 0 ? m.units.toLocaleString() : '—'}</td>
+        <td style="color:${m.rev>0?'var(--green)':'inherit'};font-weight:${m.rev>0?'600':'400'}">${m.rev > 0 ? fmt(m.rev) : '—'}</td>
+        <td style="color:${m.exp>0?'var(--red)':'inherit'}">${m.exp > 0 ? fmt(m.exp) : '—'}</td>
+        <td style="font-weight:${m.profit>0?'600':'400'}">${m.rev > 0 ? fmt(m.profit) : '—'}</td>
+        <td>${m.rev > 0 ? fmt(m.invPayout) : '—'}</td>
+        <td style="color:var(--green);font-weight:600">${m.rev > 0 ? fmt(m.yours) : '—'}</td>
+        <td>${m.rev > 0 ? `<span class="badge ${margin>=70?'badge-green':margin>=40?'badge-gold':'badge-red'}">${margin}%</span>` : '—'}</td>
+      </tr>`;
+    });
+    const totRow = `<tr style="background:var(--navy)">
+      <td style="color:var(--gold);font-weight:700">TOTAL ${selYear}</td>
+      <td style="color:white;font-weight:600">${monthData.reduce((s,m)=>s+m.units,0).toLocaleString()}</td>
+      <td style="color:var(--green2);font-weight:700">${fmt(totalRev)}</td>
+      <td style="color:#ff7b7b;font-weight:600">${fmt(totalExp)}</td>
+      <td style="color:white;font-weight:700">${fmt(totalProfit)}</td>
+      <td style="color:var(--gold)">${fmt(totalProfit*(window.DATA?.investor?.share||35)/100)}</td>
+      <td style="color:var(--green2);font-weight:700">${fmt(totalProfit*(1-(window.DATA?.investor?.share||35)/100))}</td>
+      <td style="color:white">${totalRev ? Math.round((totalProfit/totalRev)*100)+'%' : '—'}</td>
+    </tr>`;
+    tbody.innerHTML = rows.join('') + totRow;
+  }
+  // Product breakdown
+  const breakdown = document.getElementById('product-breakdown');
+  if (breakdown) {
+    const productRevMap = {};
+    sales.forEach(s => {
+      productRevMap[s.product] = (productRevMap[s.product]||0) + (s.totalRevenue||s.units*s.price||0);
+    });
+    const totalAllRev = Object.values(productRevMap).reduce((s,v)=>s+v,0);
+    breakdown.innerHTML = Object.entries(productRevMap).sort((a,b)=>b[1]-a[1]).map(([name,rev]) => {
+      const share = totalAllRev ? Math.round((rev/totalAllRev)*100) : 0;
+      return `<div style="background:var(--white);border-radius:14px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+          <span style="font-weight:600;font-size:14px">${name}</span>
+          <span style="font-weight:700;color:var(--green)">${fmt(rev)}</span>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar green" style="width:${share}%"></div></div>
+        <div style="font-size:12px;color:var(--gray);margin-top:6px">${share}% of total revenue</div>
+      </div>`;
+    }).join('') || '<div style="color:var(--gray);font-size:13px">No sales data yet</div>';
+  }
+}
+
+// ─── OVERRIDE renderDashboard TO INCLUDE LOW STOCK ───
+const _origRenderDashboard = renderDashboard;
+function renderDashboard() {
+  _origRenderDashboard();
+  renderLowStockAlerts();
+}
+
 </script>
 </body>
 </html>
