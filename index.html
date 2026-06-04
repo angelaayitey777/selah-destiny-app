@@ -669,7 +669,8 @@ function showSync(msg, type) {
 // ─── LOAD FROM FIREBASE ───
 async function loadFromFirebase() {
   try {
-    // Config
+    showSync('⟳ Connecting to cloud...', 'syncing');
+
     const cfgDoc = await getDoc(doc(db, 'sde', 'config'));
     if (cfgDoc.exists()) DATA.config = { ...DATA.config, ...cfgDoc.data() };
 
@@ -680,7 +681,6 @@ async function loadFromFirebase() {
     if (stockDoc.exists()) DATA.stock = { ...DATA.stock, ...stockDoc.data() };
     else DATA.stock['Ovulation Thermometer'] = 200;
 
-    // Collections
     const salesSnap = await getDocs(collection(db, 'sde_sales'));
     DATA.sales = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -699,10 +699,31 @@ async function loadFromFirebase() {
     document.getElementById('loading-overlay').style.display = 'none';
     setToday();
     renderAll();
-    showSync('✅ Connected to cloud — data loaded', 'saved');
+    showSync('✅ Connected — data loaded', 'saved');
   } catch(e) {
+    console.error('Firebase error:', e);
     document.getElementById('loading-overlay').style.display = 'none';
-    showSync('⚠ Cloud connection issue — check internet', 'error');
+    // Try to identify the specific issue
+    if (e.code === 'permission-denied') {
+      showSync('⚠ Permission denied — check Firebase rules', 'error');
+    } else if (e.message && e.message.includes('offline')) {
+      showSync('⚠ You appear to be offline', 'error');
+    } else {
+      // Retry once after 3 seconds
+      showSync('⟳ Retrying connection...', 'syncing');
+      setTimeout(async () => {
+        try {
+          const testDoc = await getDoc(doc(db, 'sde', 'config'));
+          if (testDoc.exists()) DATA.config = { ...DATA.config, ...testDoc.data() };
+          document.getElementById('sync-bar').className = 'hidden';
+          setToday(); renderAll();
+          showSync('✅ Connected — data loaded', 'saved');
+        } catch(e2) {
+          showSync('⚠ Cannot reach database. Check your internet connection.', 'error');
+          setToday(); renderAll();
+        }
+      }, 3000);
+    }
     setToday(); renderAll();
   }
 }
@@ -795,6 +816,7 @@ function renderDashboard() {
   document.getElementById('inv-prog-label').textContent=fmt(invPayout)+' / '+fmt(invTarget);
   document.getElementById('inv-prog-bar').style.width=pct(invPayout,invTarget)+'%';
   document.getElementById('inv-prog-note').textContent=pct(invPayout,invTarget)+'% of investor return target reached (projected)';
+  renderLowStockAlerts();
   const recent=[...window.DATA.sales].sort((a,b)=>b.ts-a.ts).slice(0,5);
   const tbody=document.getElementById('d-recent-sales');
   tbody.innerHTML=recent.length?recent.map(s=>`<tr><td>${s.date}</td><td>${s.clientName||'—'}</td><td>${s.product}</td><td>${fmt(s.totalRevenue||s.units*s.price)}</td></tr>`).join(''):'<tr><td colspan="4"><div class="empty"><div class="icon">📭</div><p>No sales yet</p></div></td></tr>';
@@ -1439,12 +1461,7 @@ function renderMonthly() {
   }
 }
 
-// ─── OVERRIDE renderDashboard TO INCLUDE LOW STOCK ───
-const _origRenderDashboard = renderDashboard;
-function renderDashboard() {
-  _origRenderDashboard();
-  renderLowStockAlerts();
-}
+
 
 </script>
 </body>
