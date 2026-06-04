@@ -700,6 +700,7 @@ async function loadFromFirebase() {
     setToday();
     renderAll();
     showSync('✅ Connected — data loaded', 'saved');
+    setTimeout(() => { document.getElementById('sync-bar').className = 'hidden'; }, 3000);
   } catch(e) {
     console.error('Firebase error:', e);
     document.getElementById('loading-overlay').style.display = 'none';
@@ -718,6 +719,7 @@ async function loadFromFirebase() {
           document.getElementById('sync-bar').className = 'hidden';
           setToday(); renderAll();
           showSync('✅ Connected — data loaded', 'saved');
+    setTimeout(() => { document.getElementById('sync-bar').className = 'hidden'; }, 3000);
         } catch(e2) {
           showSync('⚠ Cannot reach database. Check your internet connection.', 'error');
           setToday(); renderAll();
@@ -1178,19 +1180,17 @@ function renderPL() {
 
 // ─── SETTINGS ───
 function loadConfigUI() {
-  const c=window.DATA.config||{}, i=window.DATA.investor||{};
-  document.getElementById('cfg-name').value=c.name||'';
-  document.getElementById('cfg-ceo').value=c.ceo||'';
-  document.getElementById('cfg-start').value=c.startDate||'';
-  document.getElementById('cfg-units').value=c.units||27000;
-  document.getElementById('cfg-inv-name').value=i.name||'';
-  document.getElementById('cfg-inv-capital').value=i.capital||39700;
-  document.getElementById('cfg-inv-share').value=i.share||35;
-  document.getElementById('cfg-inv-target').value=i.target||79400;
-  document.getElementById('cfg-inv-date').value=i.date||'';
-  document.getElementById('cfg-s1').value=window.DATA.stock?.['Ovulation Test Strips']||20000;
-  document.getElementById('cfg-s2').value=window.DATA.stock?.['Ovulation Cassettes']||5000;
-  document.getElementById('cfg-s3').value=window.DATA.stock?.['Pregnancy Test Strips']||2000;
+  const c=window.DATA?.config||{}, i=window.DATA?.investor||{};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  set('cfg-name', c.name||'');
+  set('cfg-ceo', c.ceo||'');
+  set('cfg-start', c.startDate||'');
+  set('cfg-units', c.units||27000);
+  set('cfg-inv-name', i.name||'');
+  set('cfg-inv-capital', i.capital||39700);
+  set('cfg-inv-share', i.share||35);
+  set('cfg-inv-target', i.target||79400);
+  set('cfg-inv-date', i.date||'');
 }
 async function saveConfig() {
   window.DATA.config.name=document.getElementById('cfg-name').value;
