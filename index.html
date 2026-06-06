@@ -34,6 +34,8 @@
     z-index: 100; box-shadow: 4px 0 24px rgba(13,27,42,0.18);
     transition: transform 0.3s;
   }
+  .sidebar.collapsed { transform: translateX(-260px); }
+  .main.expanded { margin-left: 0; }
   .sidebar-brand { padding: 28px 24px 20px; border-bottom: 1px solid rgba(201,168,76,0.25); }
   .sidebar-brand h1 { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--gold); line-height: 1.3; letter-spacing: 0.3px; }
   .sidebar-brand p { font-size: 11px; color: var(--gray); margin-top: 4px; letter-spacing: 0.8px; text-transform: uppercase; }
@@ -48,14 +50,14 @@
   .sidebar-footer { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.07); font-size: 11px; color: var(--gray); line-height: 1.6; }
 
   /* HAMBURGER */
-  .hamburger { display: none; position: fixed; top: 44px; left: 12px; z-index: 200; background: var(--navy); border: none; color: var(--gold); font-size: 22px; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .hamburger { display: block; position: fixed; top: 44px; left: 12px; z-index: 200; background: var(--navy); border: none; color: var(--gold); font-size: 22px; padding: 6px 10px; border-radius: 6px; cursor: pointer; transition: left 0.3s; }
 
   /* MAIN */
-  .main { margin-left: 260px; min-height: 100vh; padding-top: 36px; }
+  .main { margin-left: 260px; min-height: 100vh; padding-top: 36px; overflow-x: hidden; }
   .topbar { background: var(--white); padding: 18px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(13,27,42,0.05); }
   .topbar h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--navy); }
   .topbar-date { font-size: 13px; color: var(--gray); }
-  .content { padding: 28px 32px; }
+  .content { padding: 28px 32px; max-width: 100%; overflow-x: hidden; }
 
   /* PAGES */
   .page { display: none; }
@@ -91,7 +93,7 @@
   .btn-sm { padding: 6px 14px; font-size: 12px; }
 
   /* TABLES */
-  .table-wrap { background: var(--white); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--border); overflow-x: auto; }
+  .table-wrap { background: var(--white); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--border); overflow-x: auto; max-width: 100%; }
   table { width: 100%; border-collapse: collapse; min-width: 500px; }
   thead tr { background: var(--navy); }
   thead th { padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
@@ -198,10 +200,11 @@
 
   /* RESPONSIVE */
   @media (max-width: 900px) {
-    .sidebar { transform: translateX(-100%); top: 36px; }
+    .sidebar { transform: translateX(-260px); top: 36px; }
     .sidebar.open { transform: translateX(0); }
+    .sidebar.collapsed { transform: translateX(-260px); }
     .main { margin-left: 0; }
-    .hamburger { display: block; }
+    .main.expanded { margin-left: 0; }
     .cards-row { grid-template-columns: repeat(2,1fr); }
     .form-grid { grid-template-columns: repeat(2,1fr); }
     .two-col { grid-template-columns: 1fr; }
@@ -362,7 +365,15 @@
         <div class="card"><div class="card-label">Units Sold</div><div class="card-value" id="s-total-units">0</div></div>
         <div class="card"><div class="card-label">Avg Price/Unit</div><div class="card-value" id="s-avg-price">GH₵ 0</div></div>
       </div>
-      <div class="section-header"><span class="section-title">Sales Record</span><button class="btn btn-primary btn-sm" onclick="exportCSV('sales')">⬇ Export CSV</button></div>
+      <div class="section-header">
+        <span class="section-title">Sales Record</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="s-filter-product" onchange="renderSalesTable()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none">
+            <option value="">All Products</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="exportCSV('sales')">⬇ Export CSV</button>
+        </div>
+      </div>
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Phone</th><th>Location</th><th>Product</th><th>Package</th><th>Qty</th><th>Units</th><th>Revenue</th><th>Channel</th><th>Notes</th><th></th></tr></thead><tbody id="sales-tbody"></tbody></table></div>
     </div>
 
@@ -616,6 +627,30 @@
     </div>
 
 
+<!-- EDIT SALE MODAL -->
+<div class="modal-overlay" id="edit-sale-modal">
+  <div class="modal" style="width:90%;max-width:580px">
+    <h3>Edit Sale Record</h3>
+    <input type="hidden" id="edit-sale-id"/>
+    <div class="form-grid" style="margin-bottom:16px">
+      <div class="form-group"><label>Date</label><input type="date" id="edit-s-date"/></div>
+      <div class="form-group"><label>Client Name</label><input type="text" id="edit-s-client-name"/></div>
+      <div class="form-group"><label>Phone</label><input type="tel" id="edit-s-client-phone"/></div>
+      <div class="form-group"><label>Location</label><input type="text" id="edit-s-client-location"/></div>
+      <div class="form-group"><label>Units</label><input type="number" id="edit-s-units" min="1"/></div>
+      <div class="form-group"><label>Total Revenue (GH₵)</label><input type="number" id="edit-s-revenue" step="0.01"/></div>
+      <div class="form-group"><label>Channel</label>
+        <select id="edit-s-channel"><option>Instagram DM</option><option>Facebook DM</option><option>TikTok</option><option>WhatsApp</option><option>Walk-in / Referral</option><option>Paid Ad Order</option></select>
+      </div>
+      <div class="form-group"><label>Notes</label><input type="text" id="edit-s-notes"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeEditSale()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveEditSale()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -763,7 +798,17 @@ function setToday() {
   document.getElementById('sal-date').value = today();
   document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 }
-function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const main = document.querySelector('.main');
+  const isMobile = window.innerWidth <= 900;
+  if (isMobile) {
+    sidebar.classList.toggle('open');
+  } else {
+    sidebar.classList.toggle('collapsed');
+    main.classList.toggle('expanded');
+  }
+}
 
 // ─── COMPUTED ───
 function totalRevenue() { return (window.DATA?.sales||[]).reduce((s,x) => s+(x.totalRevenue||x.units*x.price),0); }
@@ -1005,13 +1050,24 @@ async function deleteSale(id) {
   renderAll();
 }
 function renderSalesTable() {
-  const rev=totalRevenue(), units=totalUnits();
+  // Refresh product filter dropdown
+  const filterSel = document.getElementById('s-filter-product');
+  if (filterSel) {
+    const products = (window.DATA?.products||[]).map(p=>p.name);
+    const curFilter = filterSel.value;
+    filterSel.innerHTML = '<option value="">All Products</option>' + products.map(p=>`<option${p===curFilter?' selected':''}>${p}</option>`).join('');
+  }
+  const filterVal = filterSel?.value || '';
+  const allSales = window.DATA.sales || [];
+  const filtered = filterVal ? allSales.filter(s=>s.product===filterVal) : allSales;
+  const rev=filtered.reduce((s,x)=>s+(x.totalRevenue||x.units*x.price||0),0);
+  const units=filtered.reduce((s,x)=>s+Number(x.units||0),0);
   document.getElementById('s-total-rev').textContent=fmt(rev);
   document.getElementById('s-total-units').textContent=units.toLocaleString();
   document.getElementById('s-avg-price').textContent=units?fmt(rev/units):'GH₵ 0';
   const tbody=document.getElementById('sales-tbody');
-  const sorted=[...window.DATA.sales].sort((a,b)=>b.ts-a.ts);
-  tbody.innerHTML=sorted.length?sorted.map(s=>`<tr><td>${s.date}</td><td style='font-weight:600'>${s.clientName||'—'}</td><td>${s.clientPhone||'—'}</td><td>${s.clientLocation||'—'}</td><td>${s.product}</td><td><span class='badge badge-gold'>${s.bundle||'—'}</span></td><td>${s.qty||1}x</td><td>${s.units}</td><td>${fmt(s.totalRevenue||s.units*s.price)}</td><td><span class='badge badge-navy'>${s.channel}</span></td><td>${s.notes||'—'}</td><td><button class='btn btn-red' onclick="deleteSale('${s.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="12"><div class="empty"><div class="icon">💰</div><p>No sales yet</p></div></td></tr>';
+  const sorted=[...filtered].sort((a,b)=>b.ts-a.ts);
+  tbody.innerHTML=sorted.length?sorted.map(s=>`<tr><td>${s.date}</td><td style='font-weight:600'>${s.clientName||'—'}</td><td>${s.clientPhone||'—'}</td><td>${s.clientLocation||'—'}</td><td>${s.product}</td><td><span class='badge badge-gold'>${s.bundle||'—'}</span></td><td>${s.qty||1}x</td><td>${s.units}</td><td>${fmt(s.totalRevenue||s.units*s.price)}</td><td><span class='badge badge-navy'>${s.channel}</span></td><td>${s.notes||'—'}</td><td style='display:flex;gap:6px'><button class='btn btn-primary btn-sm' onclick="openEditSale('${s.id}')">✏</button><button class='btn btn-red' onclick="deleteSale('${s.id}')">✕</button></td></tr>`).join(''):'<tr><td colspan="12"><div class="empty"><div class="icon">💰</div><p>No sales yet</p></div></td></tr>';
 }
 
 // ─── EXPENSES ───
@@ -1462,6 +1518,52 @@ function renderMonthly() {
 }
 
 
+
+// ─── EDIT SALE ───
+function openEditSale(id) {
+  const s = window.DATA.sales.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('edit-sale-id').value = id;
+  document.getElementById('edit-s-date').value = s.date || '';
+  document.getElementById('edit-s-client-name').value = s.clientName || '';
+  document.getElementById('edit-s-client-phone').value = s.clientPhone || '';
+  document.getElementById('edit-s-client-location').value = s.clientLocation || '';
+  document.getElementById('edit-s-units').value = s.units || '';
+  document.getElementById('edit-s-revenue').value = s.totalRevenue || (s.units * s.price) || '';
+  document.getElementById('edit-s-channel').value = s.channel || 'Instagram DM';
+  document.getElementById('edit-s-notes').value = s.notes || '';
+  document.getElementById('edit-sale-modal').classList.add('show');
+}
+function closeEditSale() {
+  document.getElementById('edit-sale-modal').classList.remove('show');
+}
+async function saveEditSale() {
+  const id = document.getElementById('edit-sale-id').value;
+  const s = window.DATA.sales.find(x => x.id === id);
+  if (!s) return;
+  const newUnits = parseInt(document.getElementById('edit-s-units').value) || s.units;
+  const newRevenue = parseFloat(document.getElementById('edit-s-revenue').value) || s.totalRevenue;
+  const unitDiff = newUnits - s.units;
+  // Update stock
+  if (unitDiff !== 0 && window.DATA.stock[s.product] !== undefined) {
+    window.DATA.stock[s.product] = Math.max(0, window.DATA.stock[s.product] - unitDiff);
+    await window.saveDoc_(['sde','stock'], window.DATA.stock);
+  }
+  // Update record
+  s.date = document.getElementById('edit-s-date').value;
+  s.clientName = document.getElementById('edit-s-client-name').value;
+  s.clientPhone = document.getElementById('edit-s-client-phone').value;
+  s.clientLocation = document.getElementById('edit-s-client-location').value;
+  s.units = newUnits;
+  s.totalRevenue = newRevenue;
+  s.channel = document.getElementById('edit-s-channel').value;
+  s.notes = document.getElementById('edit-s-notes').value;
+  window.showSync_('⟳ Saving changes...', 'syncing');
+  await window.setDoc_(window.doc_(window.DB, 'sde_sales', id), s);
+  window.showSync_('✅ Sale updated', 'saved');
+  closeEditSale();
+  renderAll();
+}
 
 </script>
 </body>
